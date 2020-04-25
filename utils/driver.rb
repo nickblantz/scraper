@@ -11,21 +11,21 @@ class Integer
 end
 
 ENV['PATH'] = ENV['PATH'] + ';.\bin'
-POOL_SIZE = 6
+POOL_SIZE = 4
 SCRAPE_RECURSE_MAX_DEPTH = 2
 JOBS = Channel.new(buffer: :buffered, capacity: Integer::MAX)
-RESULTS = Channel.new(buffer: :buffered, capacity: Integer::MAX)
+RECALLS = Hash.new()
 GOOGLE_SEARCH_XPATH = '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a'
-ADBLOCK_EXTENSION_PATH = 'C:\Users\Nick Blantz\AppData\Local\Google\Chrome\User Data\Default\Extensions\gighmmpiobklfepjocnamgkkbiglidom\4.10.0_0'
-
+# ADBLOCK_EXTENSION_PATH = 'C:\Users\Nick Blantz\AppData\Local\Google\Chrome\User Data\Default\Extensions\gighmmpiobklfepjocnamgkkbiglidom\4.10.0_0'
+ADBLOCK_EXTENSION_PATH = 'C:\Users\Admin\AppData\Local\Google\Chrome\User Data\Profile 1\Extensions\gighmmpiobklfepjocnamgkkbiglidom\4.10.0_0'
 
 def create_driver(id)
   options = Selenium::WebDriver::Chrome::Options.new()
-  options.add_argument('--headless')
-  options.add_argument('--disable-gpu')
-  # options.add_argument('--disable-software-rasterizer')
   options.add_argument("load-extension=#{ADBLOCK_EXTENSION_PATH}")
   options.add_argument("user-data-dir=selenium_data\\user_data_#{id}")
+  # options.add_argument('--headless')
+  # options.add_argument('--disable-gpu')
+  # options.add_argument('--disable-software-rasterizer')
   Selenium::WebDriver.for(:chrome, options: options)
 
   # Close tab code
@@ -41,7 +41,8 @@ def create_driver(id)
   # puts 'tab closed'
 end
 
-def register_recall(recall, jobs, driver) 
+def register_recall(recall, jobs, recalls, driver)
+  recalls[recall['RecallID']] = recall
   images = recall['Images'].map { |image| image['URL'] }
   images.each do |image|
     jobs << { msg_type: :IMAGE_SEARCH_LINKS, image_url: image }
@@ -127,37 +128,61 @@ def google_image_search(driver: nil, image_url: '')
   nil
 end
 
-def scraper_worker(id, jobs, results, driver)
+def analyze_link()
+
+end
+
+def analyze_content(content, recall_id)
+  recall = RECALLS[recall_id]
+
+  
+  
+end
+
+def common_substrings(s0, s1, min_size = 6)
+  table = Array.new(s0.length, Array.new(s1.length, 0))
+  results = Array.new()
+
+  s0.split('').each_with_index { |c0, i0|
+    s1.split('').each { |c1, i1|
+      next if c0 != c1
+      table[i0][i1] = (i0 == 0 || i1 == 0 ) ? 1 : table[i0 - 1][i1 - 1] + 1
+      if table[i0][i1] >= min_size
+        results += s0.[i - ]
+      end
+    }
+  }
+end
+
+def scraper_worker(id, jobs, recalls, driver)
   jobs.each do |job|
     puts "[#{id}] workin on #{job}"
     case job[:msg_type]
     when :REGISTER_RECALL
-      register_recall(job[:recall], jobs, driver)
+      register_recall(job[:recall], jobs, recalls, driver)
     when :IMAGE_SEARCH_LINKS
       google_image_search(driver: driver, image_url: job[:image_url])
       links = get_links(driver: driver, xpath: GOOGLE_SEARCH_XPATH)
       for link in links
-        jobs << { msg_type: :CATEGORIZE_PAGE, page_url: link, recurse_count: 0 }
-        jobs << { msg_type: :SCRAPE_PAGE, page_url: link, recurse_count: 0 }
+        jobs << { msg_type: :CATEGORIZE_PAGE, page_url: link, recall_id: job[:recall]['RecallID'] }
+        jobs << { msg_type: :SCRAPE_PAGE, page_url: link, recall_id: job[:recall]['RecallID'], recurse_depth: 0 }
       end
     when :CATEGORIZE_PAGE
-      if job[:recurse_count] < SCRAPE_RECURSE_MAX_DEPTH
-        text = get_text(driver: driver, url: job[:page_url])
-        puts "[#{id}] got content, length: #{text[0].length()}"
-        # for text in get_text(driver: driver, url: job[:page_url])
-        # end
-      end
+      text = get_text(driver: driver, url: job[:page_url])
+      puts "[#{id}] got content, length: #{text[0].length()}"
+      # for text in get_text(driver: driver, url: job[:page_url])
+      # end
     when :SCRAPE_PAGE
-      if job[:recurse_count] < SCRAPE_RECURSE_MAX_DEPTH
+      if job[:recurse_depth] < SCRAPE_RECURSE_MAX_DEPTH
         links = get_links(driver: driver, url: job[:page_url])
         puts "[#{id}] got links, length: #{links.length()}" 
         for link in get_links(driver: driver, url: job[:page_url])
-          jobs << { msg_type: :CATEGORIZE_PAGE, page_url: link, recurse_count: job[:recurse_count] + 1 }
-          jobs << { msg_type: :SCRAPE_PAGE, page_url: link, recurse_count: job[:recurse_count] + 1 }
+          jobs << { msg_type: :CATEGORIZE_PAGE, page_url: link, recall_id: job[:recall_id] }
+          jobs << { msg_type: :SCRAPE_PAGE, page_url: link, recall_id: job[:recall_id], recurse_depth: job[:recurse_depth] + 1 }
         end
       end
     else
-      results << { msg_type: :ERROR, content: 'Message type not supported' }
+      # Do nothing for unrecognized msg_type
     end
   end
   driver.quit()

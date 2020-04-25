@@ -3,6 +3,7 @@ require 'sinatra'
 require './utils/driver.rb'
 require './utils/recall.rb'
 
+puts "starting main"
 JOBS << { type: :UNDEFINED }
 
 get '/scrape_recall/:recall_id' do |recall_id|
