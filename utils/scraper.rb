@@ -1,5 +1,9 @@
 require 'concurrent-edge'
 require 'selenium-webdriver'
+# require 'uri'
+# require './utils/analyzers.rb'
+
+
 
 Channel = Concurrent::Channel
 
@@ -16,10 +20,11 @@ SCRAPE_RECURSE_MAX_DEPTH = 2
 JOBS = Channel.new(buffer: :buffered, capacity: Integer::MAX)
 RECALLS = Hash.new()
 GOOGLE_SEARCH_XPATH = '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a'
-# ADBLOCK_EXTENSION_PATH = 'C:\Users\Nick Blantz\AppData\Local\Google\Chrome\User Data\Default\Extensions\gighmmpiobklfepjocnamgkkbiglidom\4.10.0_0'
-ADBLOCK_EXTENSION_PATH = 'C:\Users\Admin\AppData\Local\Google\Chrome\User Data\Profile 1\Extensions\gighmmpiobklfepjocnamgkkbiglidom\4.10.0_0'
+ADBLOCK_EXTENSION_PATH = 'C:\Users\Nick Blantz\AppData\Local\Google\Chrome\User Data\Default\Extensions\gighmmpiobklfepjocnamgkkbiglidom\4.10.0_0'
+# ADBLOCK_EXTENSION_PATH = 'C:\Users\Admin\AppData\Local\Google\Chrome\User Data\Profile 1\Extensions\gighmmpiobklfepjocnamgkkbiglidom\4.10.0_0'
 
 def create_driver(id)
+  puts "[#{id}] creating worker"
   options = Selenium::WebDriver::Chrome::Options.new()
   options.add_argument("load-extension=#{ADBLOCK_EXTENSION_PATH}")
   options.add_argument("user-data-dir=selenium_data\\user_data_#{id}")
@@ -113,48 +118,24 @@ def google_image_search(driver: nil, image_url: '')
 
   wait = Selenium::WebDriver::Wait.new(:timeout => 15)
 
-  input = wait.until {
+  search_input = wait.until {
     element = driver.find_element(:name, 'image_url')
     element if element.displayed?
   }
-  input.send_keys(image_url)
-
+  search_input.send_keys(image_url)
   driver.action.send_keys(:enter).perform
-
-  wait.until {
-    element = driver.find_element(:id, 'search')
+  search_input = wait.until {
+    element = driver.find_element(:name, 'q')
+    element if element.displayed?
   }
+  search_input.send_keys(' for sale')
+  driver.action.send_keys(:enter).perform
 
   nil
 end
 
-def analyze_link()
-
-end
-
-def analyze_content(content, recall_id)
-  recall = RECALLS[recall_id]
-
-  
-  
-end
-
-def common_substrings(s0, s1, min_size = 6)
-  table = Array.new(s0.length, Array.new(s1.length, 0))
-  results = Array.new()
-
-  s0.split('').each_with_index { |c0, i0|
-    s1.split('').each { |c1, i1|
-      next if c0 != c1
-      table[i0][i1] = (i0 == 0 || i1 == 0 ) ? 1 : table[i0 - 1][i1 - 1] + 1
-      if table[i0][i1] >= min_size
-        results += s0.[i - ]
-      end
-    }
-  }
-end
-
 def scraper_worker(id, jobs, recalls, driver)
+  # driver = create_driver(id)
   jobs.each do |job|
     puts "[#{id}] workin on #{job}"
     case job[:msg_type]
@@ -163,22 +144,27 @@ def scraper_worker(id, jobs, recalls, driver)
     when :IMAGE_SEARCH_LINKS
       google_image_search(driver: driver, image_url: job[:image_url])
       links = get_links(driver: driver, xpath: GOOGLE_SEARCH_XPATH)
+      puts "[#{id}] got links (length: #{links.length()})" 
       for link in links
+        puts link
         jobs << { msg_type: :CATEGORIZE_PAGE, page_url: link, recall_id: job[:recall]['RecallID'] }
         jobs << { msg_type: :SCRAPE_PAGE, page_url: link, recall_id: job[:recall]['RecallID'], recurse_depth: 0 }
+        puts 'jobs added'
       end
     when :CATEGORIZE_PAGE
       text = get_text(driver: driver, url: job[:page_url])
-      puts "[#{id}] got content, length: #{text[0].length()}"
+      puts "[#{id}] got content (length: #{text[0].length()})"
       # for text in get_text(driver: driver, url: job[:page_url])
       # end
     when :SCRAPE_PAGE
       if job[:recurse_depth] < SCRAPE_RECURSE_MAX_DEPTH
         links = get_links(driver: driver, url: job[:page_url])
-        puts "[#{id}] got links, length: #{links.length()}" 
-        for link in get_links(driver: driver, url: job[:page_url])
-          jobs << { msg_type: :CATEGORIZE_PAGE, page_url: link, recall_id: job[:recall_id] }
-          jobs << { msg_type: :SCRAPE_PAGE, page_url: link, recall_id: job[:recall_id], recurse_depth: job[:recurse_depth] + 1 }
+        puts "[#{id}] got links (length: #{links.length()})" 
+        for link in links
+          # if LinkAnalyzer::analyze(link, job[:page_url])
+            jobs << { msg_type: :CATEGORIZE_PAGE, page_url: link, recall_id: job[:recall_id] }
+            jobs << { msg_type: :SCRAPE_PAGE, page_url: link, recall_id: job[:recall_id], recurse_depth: job[:recurse_depth] + 1 }
+          # end
         end
       end
     else
@@ -189,5 +175,5 @@ def scraper_worker(id, jobs, recalls, driver)
 end
 
 (0...POOL_SIZE).each do |id|
-  Channel.go { scraper_worker(id, JOBS, RESULTS, create_driver(id)) }
+  Channel.go { scraper_worker(id, JOBS, RECALLS, create_driver(id)) }
 end

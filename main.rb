@@ -1,10 +1,8 @@
 require 'json'
 require 'sinatra'
-require './utils/driver.rb'
 require './utils/recall.rb'
+require './utils/scraper.rb'
 
-puts "starting main"
-JOBS << { type: :UNDEFINED }
 
 get '/scrape_recall/:recall_id' do |recall_id|
   JOBS << { msg_type: :REGISTER_RECALL, recall: get_recall(recall_id) } 
