@@ -1,8 +1,6 @@
 module LinkAnalyzer
   require 'uri'
 
-  HOST_WHITELIST = ['www.ebay.com', 'www.amazon.com', 'craigslist.org', 'www.walmart.com', 'www.target.com', 'www.sears.com', 'www.wish.com', 'www.kohls.com', 'www.costco.com', 'www.aliexpress.com']
-
   def self.configure(config)
     @host_whitelist = config['hostWhitelist']
   end
@@ -18,7 +16,7 @@ module LinkAnalyzer
   end
 
   def self.whitelist_contains?(uri)
-    for host in HOST_WHITELIST.each do
+    for host in @host_whitelist.each do
       return true if uri.host.include?(host)
     end
 
@@ -39,9 +37,6 @@ module LinkAnalyzer
 end
 
 module ContentAnalyzer
-  MIN_LCS_LENGTH = 15
-  FOR_SALE_WHITELIST = ['For Sale', 'for sale', 'selling', 'price']
-
   def self.configure(config)
     @min_least_common_substring_length = config['minLeastCommonSubstringLength']
     @for_sale_whitelist = config['forSaleWhitelist']
@@ -64,11 +59,11 @@ module ContentAnalyzer
     }
 
     # puts 'content analysis result: ' + result
-    return longest >= MIN_LCS_LENGTH
+    return longest >= @min_least_common_substring_length
   end
 
   def self.has_sale?(content)
-    for string in FOR_SALE_WHITELIST
+    for string in @for_sale_whitelist
       return true if content.include?(string)
     end
     
