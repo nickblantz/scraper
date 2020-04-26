@@ -14,7 +14,8 @@ end
 def write_to_log(file, message)
   time = Time.new
   timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-  file.puts("#{timestamp} #{message}")
+  puts "#{timestamp} | #{message}"
+  file.puts("#{timestamp} | #{message}")
 end
 
 module DatabaseWorkerPool
@@ -91,7 +92,7 @@ module ScraperWorkerPool
     @jobs << job
   end
 
-  def self.create_driver(id)
+  def self.create_driver(id, log_file)
     user_data_dir = "#{@user_data_path}/user_data_#{id}"
   
     if Dir.exist?(user_data_dir)
@@ -102,22 +103,24 @@ module ScraperWorkerPool
         pref_hash['profile']['exit_type'] = ''
         File.write(pref_path, JSON.generate(pref_hash))
       rescue Exception => e
-        puts e
+        write_to_log(log_file, "could not edit preferences #{e}")
       end
     else
     end
     
     begin
       options = Selenium::WebDriver::Chrome::Options.new()
-      options.add_argument("load-extension=#{Dir.pwd}/#{@adblock_extension_path}")
-      options.add_argument("user-data-dir=#{user_data_dir}")
       options.add_argument('--headless')
       options.add_argument('--disable-gpu')
-      options.add_argument('--disable-software-rasterizer')
       options.add_argument('--no-sandbox')
+      options.add_argument('--log-level=3')
+      options.add_argument('--silent')
+      options.add_argument("load-extension=#{Dir.pwd}/#{@adblock_extension_path}")
+      options.add_argument("user-data-dir=#{Dir.pwd}/#{user_data_dir}")
+      puts options.args
       Selenium::WebDriver.for(:chrome, options: options, driver_path: "#{Dir.pwd}/#{@chromedriver_binary_path}")
     rescue Exception => e
-      puts e
+      write_to_log(log_file, "could not create driver #{e}")
       return nil
     end
   end
@@ -191,7 +194,7 @@ module ScraperWorkerPool
   
   def self.google_image_search(driver: nil, image_url: '')
     google_search_xpath = '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a'
-    wait = Selenium::WebDriver::Wait.new(:timeout => 15)
+    wait = Selenium::WebDriver::Wait.new(:timeout => 30)
   
     driver.navigate.to('https://www.google.com/imghp?sbi=1')  
     search_input = wait.until {
@@ -212,7 +215,7 @@ module ScraperWorkerPool
   
   def self.google_text_search(driver: nil, search_text: '')
     google_search_xpath = '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a'
-    wait = Selenium::WebDriver::Wait.new(:timeout => 15)
+    wait = Selenium::WebDriver::Wait.new(:timeout => 30)
 
     driver.navigate.to('https://www.google.com/')
     search_input = wait.until {
@@ -229,7 +232,7 @@ module ScraperWorkerPool
     log_file = File.open("logs/scraper_worker_#{id}.log", 'w')
   
     write_to_log(log_file, "creating scraper worker")
-    driver = create_driver(id)
+    driver = create_driver(id, log_file)
     jobs.each do |job|
       write_to_log(log_file, "starting job: #{job}")
       case job[:msg_type]

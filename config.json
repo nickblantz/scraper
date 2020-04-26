@@ -9,9 +9,9 @@
         "workerPoolSize" : 1
     },
     "scraperWorkerPool" : {
-        "chromedriverBinaryPath" : "/bin/chromedriver",
-        "adBlockerExtensionPath" : "/selenium_data/adblocker_extension",
-        "userDataPath" : "/selenium_data",
+        "chromedriverBinaryPath" : "bin/chromedriver",
+        "adBlockerExtensionPath" : "selenium_data/adblocker_extension",
+        "userDataPath" : "selenium_data",
         "recurseMaxDepth" : 2,
         "workerPoolSize" : 7
         
