@@ -1,3 +1,4 @@
 selenium_data/
 bin/
+logs/
 debug.log

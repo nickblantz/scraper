@@ -1,0 +1,41 @@
+{
+    "databaseWorkerPool" : {
+        "host" : "database1.cnsz4k4bv6u3.us-east-1.rds.amazonaws.com",
+        "port" : "3306",
+        "username" : "masterusername",
+        "password" : "masterpassword",
+        "databaseName" : "database1",
+        "violationTableName" : "Violations",
+        "workerPoolSize" : 1
+    },
+    "scraperWorkerPool" : {
+        "chromedriverBinaryPath" : "/bin/chromedriver.exe",
+        "adBlockerExtensionPath" : "/selenium_data/adblocker_extension",
+        "userDataPath" : "/selenium_data",
+        "recurseMaxDepth" : 2,
+        "workerPoolSize" : 7
+        
+    },
+    "linkAnalyzer" : {
+        "hostWhitelist" : [
+            "www.ebay.com",
+            "www.amazon.com",
+            "craigslist.org",
+            "www.walmart.com",
+            "www.target.com",
+            "www.sears.com",
+            "www.wish.com",
+            "www.kohls.com",
+            "www.costco.com",
+            "www.aliexpress.com"
+        ]
+    },
+    "contentAnalyzer" : {
+        "minLongestCommonSubstringLength" : 15,
+        "forSaleWhitelist" : [
+            "For Sale",
+            "Selling",
+            "Price"
+        ]
+    }
+}
