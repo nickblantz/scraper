@@ -1,6 +1,6 @@
 require 'concurrent-edge'
+require 'json'
 require 'selenium-webdriver'
-# require 'uri'
 # require './utils/analyzers.rb'
 
 
@@ -20,30 +20,34 @@ SCRAPE_RECURSE_MAX_DEPTH = 2
 JOBS = Channel.new(buffer: :buffered, capacity: Integer::MAX)
 RECALLS = Hash.new()
 GOOGLE_SEARCH_XPATH = '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a'
-ADBLOCK_EXTENSION_PATH = 'C:\Users\Nick Blantz\AppData\Local\Google\Chrome\User Data\Default\Extensions\gighmmpiobklfepjocnamgkkbiglidom\4.10.0_0'
-# ADBLOCK_EXTENSION_PATH = 'C:\Users\Admin\AppData\Local\Google\Chrome\User Data\Profile 1\Extensions\gighmmpiobklfepjocnamgkkbiglidom\4.10.0_0'
 
 def create_driver(id)
   puts "[#{id}] creating worker"
+
+  adblock_extension_path = "#{Dir.pwd}\\selenium_data\\adblocker_extension"
+  user_data_path = "#{Dir.pwd}\\selenium_data\\user_data_#{id}"
+
+  if Dir.exist?(user_data_path)
+    begin
+      pref_path = "#{user_data_path}\\Default\\Preferences"
+      pref_str = File.read(pref_path)
+      pref_hash = JSON.parse(pref_str)
+      pref_hash['profile']['exit_type'] = ''
+      File.write(pref_path, JSON.generate(pref_hash))
+    rescue Exception => e
+      puts e
+    end
+  else
+  end
+
   options = Selenium::WebDriver::Chrome::Options.new()
-  options.add_argument("load-extension=#{ADBLOCK_EXTENSION_PATH}")
-  options.add_argument("user-data-dir=selenium_data\\user_data_#{id}")
+  options.add_argument("load-extension=#{adblock_extension_path}")
+  options.add_argument("user-data-dir=#{user_data_path}")
   # options.add_argument('--headless')
   # options.add_argument('--disable-gpu')
   # options.add_argument('--disable-software-rasterizer')
-  Selenium::WebDriver.for(:chrome, options: options)
 
-  # Close tab code
-  # wait = Selenium::WebDriver::Wait.new(:timeout => 10)
-  # body = wait.until {
-  #   driver.switch_to.window(driver.window_handles.last)
-  #   element = driver.find_element(xpath: '//body')
-  #   element if element.displayed? && driver.window_handles.length > 1
-  # }
-  # puts 'fart'
-  # body.action.key_down(:control).send_keys('w').key_up(:control).perform
-  # # body.action.send_keys(:control, 'w').perform
-  # puts 'tab closed'
+  Selenium::WebDriver.for(:chrome, options: options)
 end
 
 def register_recall(recall, jobs, recalls, driver)
@@ -134,8 +138,8 @@ def google_image_search(driver: nil, image_url: '')
   nil
 end
 
-def scraper_worker(id, jobs, recalls, driver)
-  # driver = create_driver(id)
+def scraper_worker(id, jobs, recalls)
+  driver = create_driver(id)
   jobs.each do |job|
     puts "[#{id}] workin on #{job}"
     case job[:msg_type]
@@ -146,10 +150,8 @@ def scraper_worker(id, jobs, recalls, driver)
       links = get_links(driver: driver, xpath: GOOGLE_SEARCH_XPATH)
       puts "[#{id}] got links (length: #{links.length()})" 
       for link in links
-        puts link
         jobs << { msg_type: :CATEGORIZE_PAGE, page_url: link, recall_id: job[:recall]['RecallID'] }
         jobs << { msg_type: :SCRAPE_PAGE, page_url: link, recall_id: job[:recall]['RecallID'], recurse_depth: 0 }
-        puts 'jobs added'
       end
     when :CATEGORIZE_PAGE
       text = get_text(driver: driver, url: job[:page_url])
@@ -175,5 +177,5 @@ def scraper_worker(id, jobs, recalls, driver)
 end
 
 (0...POOL_SIZE).each do |id|
-  Channel.go { scraper_worker(id, JOBS, RECALLS, create_driver(id)) }
+  Channel.go { scraper_worker(id, JOBS, RECALLS) }
 end
