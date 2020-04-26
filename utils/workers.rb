@@ -12,9 +12,9 @@ class Integer
 end
 
 def write_to_log(file, message)
-  # time = Time.new
-  # timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-  # file.puts("#{timestamp} #{message}")
+  time = Time.new
+  timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+  file.puts("#{timestamp} #{message}")
 end
 
 module DatabaseWorkerPool
@@ -39,7 +39,7 @@ module DatabaseWorkerPool
   end
 
   def self.create_connection(id)
-    conn = Mysql2::Client.new(
+    Mysql2::Client.new(
       host: @host,
       port: @port,
       username: @username,
@@ -50,7 +50,6 @@ module DatabaseWorkerPool
   
   def self.database_worker(id, jobs)
     log_file = File.open("logs/database_worker_#{id}.log", 'w')
-  
     write_to_log(log_file, "creating database worker")
     conn = create_connection(id)
     jobs.each do |job|
@@ -112,9 +111,10 @@ module ScraperWorkerPool
       options = Selenium::WebDriver::Chrome::Options.new()
       options.add_argument("load-extension=#{Dir.pwd}/#{@adblock_extension_path}")
       options.add_argument("user-data-dir=#{user_data_dir}")
-      # options.add_argument('--headless')
-      # options.add_argument('--disable-gpu')
-      # options.add_argument('--disable-software-rasterizer')
+      options.add_argument('--headless')
+      options.add_argument('--disable-gpu')
+      options.add_argument('--disable-software-rasterizer')
+      options.add_argument('--no-sandbox')
       Selenium::WebDriver.for(:chrome, options: options, driver_path: "#{Dir.pwd}/#{@chromedriver_binary_path}")
     rescue Exception => e
       puts e

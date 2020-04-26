@@ -5,11 +5,11 @@
         "username" : "masterusername",
         "password" : "masterpassword",
         "databaseName" : "database1",
-        "violationTableName" : "Violations",
+        "violationTableName" : "Violation",
         "workerPoolSize" : 1
     },
     "scraperWorkerPool" : {
-        "chromedriverBinaryPath" : "/bin/chromedriver.exe",
+        "chromedriverBinaryPath" : "/bin/chromedriver",
         "adBlockerExtensionPath" : "/selenium_data/adblocker_extension",
         "userDataPath" : "/selenium_data",
         "recurseMaxDepth" : 2,
