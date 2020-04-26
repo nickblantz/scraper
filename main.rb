@@ -1,5 +1,6 @@
 require 'json'
 require 'sinatra'
+require 'sinatra/cross_origin'
 require './utils/analyzers.rb'
 require './utils/recall.rb'
 require './utils/workers.rb'
@@ -12,6 +13,14 @@ LinkAnalyzer::configure(config['linkAnalyzer'])
 
 set :bind, '*'
 set :port, 80
+
+configure do
+  enable :cross_origin
+end
+
+before do
+  response.headers['Access-Control-Allow-Origin'] = '*'
+end
 
 get '/scrape_recall/:recall_id' do |recall_id|
   ScraperWorkerPool::add_job({ msg_type: :REGISTER_RECALL, recall: get_recall(recall_id) })
