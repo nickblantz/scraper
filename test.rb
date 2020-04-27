@@ -1,17 +1,14 @@
-require 'net/http'
-# require 'open-uri'
+require 'date'
 
-# Net::HTTP.start("www.cpsc.gov") do |http|
-#   resp = http.get("/Newsroom/CPSC-RSS-Feed/Recalls-CSV")
-#   open("recalls.csv", "wb") do |file|
-#     file.write(resp.body)
-#   end
-# end
+def generate_sortable_date(date)
+  date.match(/([a-zA-Z]+) ([\d]{1,2}), ([\d]{1,4})/) { |m|
+    return '' if m.captures[0].nil? || m.captures[1].nil? || m.captures[2].nil?
 
-# response = Net::HTTP.get_response(URI.parse("https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-CSV"))
-# response.each_key do |key|
-#   puts "response[#{key}] = #{response[key]}"
-# end
+    day = m.captures[1].rjust(2, '0')
+    month = Date.strptime(m.captures[0], '%B').month.to_s.rjust(2, '0')
+    year = m.captures[2].rjust(4, '0')
+    return year + '/' + month + '/' + day
+  }
+end
 
-File.write 'recalls.csv', open('https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-CSV?').read
-
+puts generate_sortable_date('April 1, 1')

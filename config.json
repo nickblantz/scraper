@@ -5,6 +5,7 @@
         "username" : "masterusername",
         "password" : "masterpassword",
         "databaseName" : "database1",
+        "recallTableName" : "fullrecallapi",
         "violationTableName" : "Violation",
         "workerPoolSize" : 1
     },
@@ -12,9 +13,9 @@
         "chromedriverBinaryPath" : "bin/chromedriver.exe",
         "adBlockerExtensionPath" : "selenium_data/adblocker_extension",
         "userDataPath" : "selenium_data",
-        "downloadPath" : "temp",
+        "downloadPath" : "selenium_data/temp",
         "recurseMaxDepth" : 2,
-        "workerPoolSize" : 2
+        "workerPoolSize" : 1
         
     },
     "linkAnalyzer" : {
