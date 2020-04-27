@@ -11,8 +11,8 @@ ScraperWorkerPool::configure(config['scraperWorkerPool'])
 ContentAnalyzer::configure(config['contentAnalyzer'])
 LinkAnalyzer::configure(config['linkAnalyzer'])
 
-# set :bind, '*'
-# set :port, 80
+set :bind, '*' if config['server']['production']
+set :port, config['server']['port']
 
 configure do
   enable :cross_origin

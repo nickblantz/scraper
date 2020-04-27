@@ -1,5 +1,6 @@
 require 'concurrent-edge'
 require 'json'
+require 'csv'
 require 'selenium-webdriver'
 require 'mysql2'
 require 'net/http'
@@ -69,9 +70,10 @@ module DatabaseWorkerPool
           end
         end
       when :REFRESH_RECALLS
-        File.readlines(job[:recall_csv_file_path])[1..-1].each do |line|
-          recall = line.split(',')
-          recall_number = recall[0].replace!('-', '')
+        csv = CSV.new(File.read(job[:recall_csv_file_path]))
+        csv.each_with_index do |recall, i|
+          next if i == 0
+          recall_number = recall[0].gsub(/-/, '')
           recall_id = get_recall_by(recall_number: recall_number)['RecallID']
           high_priority = false
           date = recall[1]
@@ -89,8 +91,9 @@ module DatabaseWorkerPool
           distributors = recall[12]
           manufactured_in = recall[13]
           begin
+            # puts "INSERT INTO #{@recall_table_name} (`recall_id`, `recall_number`, `high_priority`, `date`, `sortable_date`, `recall_heading`, `name_of_product`, `description`, `hazard`, `remedy_type`, `units`, `conjunction_with`, `incidents`, `remedy`, `sold_at`, `distributors`, `manufactured_in`) VALUES ('#{recall_id}', '#{high_priority}', '#{date}', '#{sortable_date}', '#{recall_heading}', '#{name_of_product}', '#{description}', '#{hazard}', '#{remedy_type}', '#{units}', '#{conjunction_with}', '#{incidents}', '#{remedy}', '#{sold_at}', '#{distributors}', '#{manufactured_in}')"
             results = conn.query("INSERT INTO #{@recall_table_name} (`recall_id`, `recall_number`, `high_priority`, `date`, `sortable_date`, `recall_heading`, `name_of_product`, `description`, `hazard`, `remedy_type`, `units`, `conjunction_with`, `incidents`, `remedy`, `sold_at`, `distributors`, `manufactured_in`) 
-            VALUES ('#{recall_id}', '#{high_priority}', '#{date}', '#{sortable_date}', '#{recall_heading}', '#{name_of_product}', '#{description}', '#{hazard}', '#{remedy_type}', '#{units}', '#{conjunction_with}', '#{incidents}', '#{remedy}', '#{sold_at}', '#{distributors}', '#{manufactured_in}')")
+            VALUES ('#{recall_id}', #{recall_number}, '#{high_priority}', '#{date}', '#{sortable_date}', '#{recall_heading}', '#{name_of_product}', '#{description}', '#{hazard}', '#{remedy_type}', '#{units}', '#{conjunction_with}', '#{incidents}', '#{remedy}', '#{sold_at}', '#{distributors}', '#{manufactured_in}')")
           rescue Exception => e
             write_to_log(log_file, "Could not insert record #{e}")
           end
@@ -106,10 +109,10 @@ end
 
 module ScraperWorkerPool
   def self.configure(config)
-    @chromedriver_binary_path = config['chromedriverBinaryPath']
-    @adblock_extension_path = config['adBlockerExtensionPath']
-    @user_data_path = config['userDataPath']
-    @download_path = config['downloadPath']
+    @chromedriver_binary_path = "#{Dir.pwd}/#{config['chromedriverBinaryPath']}"
+    @adblock_extension_path = "#{Dir.pwd}/#{config['adBlockerExtensionPath']}"
+    @user_data_path = "#{Dir.pwd}/#{config['userDataPath']}"
+    @download_path = "#{Dir.pwd}/#{config['downloadPath']}" # .gsub!(/\//, '\\')
     @recurse_max_depth = config['recurseMaxDepth']
     @worker_pool_size = config['workerPoolSize']
     @jobs = Concurrent::Channel.new(buffer: :buffered, capacity: Integer::MAX)
@@ -157,25 +160,25 @@ module ScraperWorkerPool
     
     begin
       options = Selenium::WebDriver::Chrome::Options.new()
-      options.add_argument('--incognito')
-      options.add_argument('--disable-web-security')
-      # options.add_argument('--headless')
+      options.add_argument('--silent')
+      options.add_argument('--log-level=3')
+      options.add_argument('--headless')
       options.add_argument('--disable-gpu')
       options.add_argument('--no-sandbox')
-      options.add_argument('--log-level=1')
-      # options.add_argument('--silent')
       options.add_argument("--disable-software-rasterizer")
+      options.add_argument('--incognito')
+      options.add_argument('--disable-web-security')
       options.add_argument("--test-type")
-      options.add_argument("load-extension=#{Dir.pwd}/#{@adblock_extension_path}")
-      options.add_argument("user-data-dir=#{Dir.pwd}/#{user_data_dir}")
+      options.add_argument("load-extension=#{@adblock_extension_path}")
+      options.add_argument("user-data-dir=#{user_data_dir}")
       options.add_preference(
         :download, 
         directory_upgrade: true,
         prompt_for_download: false,
-        default_directory: "#{Dir.pwd}/#{@download_path}"
+        default_directory: @download_path
       )
-      driver = Selenium::WebDriver.for(:chrome, options: options, driver_path: "#{Dir.pwd}/#{@chromedriver_binary_path}")
-      # enable_chrome_headless_downloads(driver, "#{Dir.pwd}/#{@download_path}")
+      driver = Selenium::WebDriver.for(:chrome, options: options, driver_path: @chromedriver_binary_path)
+      enable_chrome_headless_downloads(driver, @download_path)
       return driver
     rescue Exception => e
       write_to_log(log_file, "could not create driver #{e}")
@@ -331,12 +334,11 @@ module ScraperWorkerPool
         end
       when :DOWNLOAD_RECALLS_CSV
         begin
-          # 'https://chromedriver.storage.googleapis.com/83.0.4103.14/chromedriver_linux64.zip'
-          driver.navigate.to('https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-CSV')
+          # driver.navigate.to('https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-CSV')
         rescue Exception => e
           puts e
         end
-        DatabaseWorkerPool::add_job({ msg_type: :REFRESH_RECALLS, recall_csv_file_path: "#{Dir.pwd}/#{@download_path}/recalls_recall_listing.csv" })
+        DatabaseWorkerPool::add_job({ msg_type: :REFRESH_RECALLS, recall_csv_file_path: "#{@download_path}\\recalls_recall_listing.csv" })
       else
         # Do nothing for unrecognized msg_type
       end
