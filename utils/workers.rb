@@ -2,7 +2,9 @@ require 'concurrent-edge'
 require 'json'
 require 'selenium-webdriver'
 require 'mysql2'
+require 'net/http'
 require './utils/analyzers.rb'
+require './utils/recall.rb'
 
 class Integer
   N_BYTES = [42].pack('i').size
@@ -29,9 +31,9 @@ module DatabaseWorkerPool
     @worker_pool_size = config['workerPoolSize']
     @jobs = Concurrent::Channel.new(buffer: :buffered, capacity: Integer::MAX)
     @processed_pages = Hash.new()
-
+    
     (0...@worker_pool_size).each do |id|
-      Concurrent::Channel.go { DatabaseWorkerPool::database_worker(id, @jobs) }
+      Concurrent::Channel.go { DatabaseWorkerPool::worker(id, @jobs) }
     end
   end
 
@@ -49,7 +51,7 @@ module DatabaseWorkerPool
     )
   end
   
-  def self.database_worker(id, jobs)
+  def self.worker(id, jobs)
     log_file = File.open("logs/database_worker_#{id}.log", 'w')
     write_to_log(log_file, "creating database worker")
     conn = create_connection(id)
@@ -62,6 +64,17 @@ module DatabaseWorkerPool
           begin
             results = conn.query("INSERT INTO #{@violation_table_name} (`violation_date`, `url`, `title`, `recall_id`, `violation_status`) VALUES ('#{Time.now.strftime("%Y-%m-%d")}', '#{job[:page_title]}', '#{job[:page_url]}', #{job[:recall_id]}, 'Possible')")
           rescue Exception => e
+            write_to_log(log_file, "Could not insert record #{e}")
+          end
+        end
+      when :REFRESH_RECALLS
+        File.readlines(job[:recall_csv_file_path])[1..-1].each do |line|
+          data = line.split(',')
+
+          begin
+            results = conn.query("INSERT INTO #{@violation_table_name} (`violation_date`, `url`, `title`, `recall_id`, `violation_status`) VALUES ('#{Time.now.strftime("%Y-%m-%d")}', '#{job[:page_title]}', '#{job[:page_url]}', #{job[:recall_id]}, 'Possible')")
+          rescue Exception => e
+            write_to_log(log_file, "Could not insert record #{e}")
           end
         end
       else
@@ -78,13 +91,14 @@ module ScraperWorkerPool
     @chromedriver_binary_path = config['chromedriverBinaryPath']
     @adblock_extension_path = config['adBlockerExtensionPath']
     @user_data_path = config['userDataPath']
+    @download_path = config['downloadPath']
     @recurse_max_depth = config['recurseMaxDepth']
     @worker_pool_size = config['workerPoolSize']
     @jobs = Concurrent::Channel.new(buffer: :buffered, capacity: Integer::MAX)
     @recalls = Hash.new
     
     (0...@worker_pool_size).each do |id|
-      Concurrent::Channel.go { ScraperWorkerPool::scraper_worker(id, @jobs, @recalls) }
+      Concurrent::Channel.go { ScraperWorkerPool::worker(id, @jobs, @recalls) }
     end
   end
 
@@ -117,7 +131,12 @@ module ScraperWorkerPool
       options.add_argument('--silent')
       options.add_argument("load-extension=#{Dir.pwd}/#{@adblock_extension_path}")
       options.add_argument("user-data-dir=#{Dir.pwd}/#{user_data_dir}")
-      puts options.args
+      options.add_preference(
+        :download, 
+        directory_upgrade: true,
+        prompt_for_download: false,
+        default_directory: "#{Dir.pwd}/#{@download_path}"
+      )
       Selenium::WebDriver.for(:chrome, options: options, driver_path: "#{Dir.pwd}/#{@chromedriver_binary_path}")
     rescue Exception => e
       write_to_log(log_file, "could not create driver #{e}")
@@ -228,7 +247,7 @@ module ScraperWorkerPool
     return nil
   end
   
-  def self.scraper_worker(id, jobs, recalls)
+  def self.worker(id, jobs, recalls)
     log_file = File.open("logs/scraper_worker_#{id}.log", 'w')
   
     write_to_log(log_file, "creating scraper worker")
@@ -271,6 +290,9 @@ module ScraperWorkerPool
             end
           end
         end
+      when :DOWNLOAD_RECALLS_CSV
+        driver.navigate.to('https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-CSV')
+        DatabaseWorkerPool::add_job({ msg_type: :REFRESH_RECALLS, recall_csv_file_path: "#{Dir.pwd}/#{@download_path}/recalls_recall_listing.csv" })
       else
         # Do nothing for unrecognized msg_type
       end

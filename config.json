@@ -9,11 +9,12 @@
         "workerPoolSize" : 1
     },
     "scraperWorkerPool" : {
-        "chromedriverBinaryPath" : "bin/chromedriver",
+        "chromedriverBinaryPath" : "bin/chromedriver.exe",
         "adBlockerExtensionPath" : "selenium_data/adblocker_extension",
         "userDataPath" : "selenium_data",
+        "downloadPath" : "temp",
         "recurseMaxDepth" : 2,
-        "workerPoolSize" : 7
+        "workerPoolSize" : 2
         
     },
     "linkAnalyzer" : {
