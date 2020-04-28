@@ -75,7 +75,7 @@ module DatabaseWorkerPool
           next if i == 0
           recall_number = recall[0].gsub(/-/, '')
           recall_id = get_recall_by(recall_number: recall_number)['RecallID']
-          high_priority = false
+          high_priority = 0
           date = recall[1]
           sortable_date = generate_sortable_date(date)
           recall_heading = recall[2]
@@ -91,9 +91,8 @@ module DatabaseWorkerPool
           distributors = recall[12]
           manufactured_in = recall[13]
           begin
-            # puts "INSERT INTO #{@recall_table_name} (`recall_id`, `recall_number`, `high_priority`, `date`, `sortable_date`, `recall_heading`, `name_of_product`, `description`, `hazard`, `remedy_type`, `units`, `conjunction_with`, `incidents`, `remedy`, `sold_at`, `distributors`, `manufactured_in`) VALUES ('#{recall_id}', '#{high_priority}', '#{date}', '#{sortable_date}', '#{recall_heading}', '#{name_of_product}', '#{description}', '#{hazard}', '#{remedy_type}', '#{units}', '#{conjunction_with}', '#{incidents}', '#{remedy}', '#{sold_at}', '#{distributors}', '#{manufactured_in}')"
-            results = conn.query("INSERT INTO #{@recall_table_name} (`recall_id`, `recall_number`, `high_priority`, `date`, `sortable_date`, `recall_heading`, `name_of_product`, `description`, `hazard`, `remedy_type`, `units`, `conjunction_with`, `incidents`, `remedy`, `sold_at`, `distributors`, `manufactured_in`) 
-            VALUES ('#{recall_id}', #{recall_number}, '#{high_priority}', '#{date}', '#{sortable_date}', '#{recall_heading}', '#{name_of_product}', '#{description}', '#{hazard}', '#{remedy_type}', '#{units}', '#{conjunction_with}', '#{incidents}', '#{remedy}', '#{sold_at}', '#{distributors}', '#{manufactured_in}')")
+            conn.query("INSERT INTO #{@recall_table_name} (  `recall_id`,    `recall_number`,   `high_priority`,   `date`,    `sortable_date`,    `recall_heading`,    `name_of_product`,    `description`,    `hazard`,    `remedy_type`,    `units`,    `conjunction_with`,    `incidents`,    `remedy`,    `sold_at`,    `distributors`,    `manufactured_in`) 
+                                                   VALUES ('#{recall_id}', '#{recall_number}', #{high_priority}, '#{date}', '#{sortable_date}', '#{recall_heading}', '#{name_of_product}', '#{description}', '#{hazard}', '#{remedy_type}', '#{units}', '#{conjunction_with}', '#{incidents}', '#{remedy}', '#{sold_at}', '#{distributors}', '#{manufactured_in}')")
           rescue Exception => e
             write_to_log(log_file, "Could not insert record #{e}")
           end
