@@ -335,7 +335,7 @@ module ScraperWorkerPool
         end
       when :DOWNLOAD_RECALLS_CSV
         begin
-          # driver.navigate.to('https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-CSV')
+          driver.navigate.to('https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-CSV')
         rescue Exception => e
           puts e
         end
