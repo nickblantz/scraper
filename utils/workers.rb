@@ -347,7 +347,7 @@ module ScraperWorkerPool
           csv_path = "#{@download_path}/recalls_recall_listing.csv"
         end
         
-        DatabaseWorkerPool::add_job({ msg_type: :REFRESH_RECALLS, recall_csv_file_path:  })
+        DatabaseWorkerPool::add_job({ msg_type: :REFRESH_RECALLS, recall_csv_file_path: csv_path })
       else
         # Do nothing for unrecognized msg_type
       end
