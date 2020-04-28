@@ -14,11 +14,11 @@ class Integer
   MIN = -MAX - 1
 end
 
-def write_to_log(file, message)
+def write_to_log(file, id, message)
   time = Time.new
   timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-  puts "#{timestamp} | #{message}"
-  file.puts("#{timestamp} | #{message}")
+  # puts "#{timestamp} |#{id}| #{message}"
+  file.puts("#{timestamp} |#{id}| #{message}")
 end
 
 module DatabaseWorkerPool
@@ -55,10 +55,10 @@ module DatabaseWorkerPool
   
   def self.worker(id, jobs)
     log_file = File.open("logs/database_worker_#{id}.log", 'w')
-    write_to_log(log_file, "creating database worker")
+    write_to_log(log_file, id, "creating database worker")
     conn = create_connection(id)
     jobs.each do |job|
-      write_to_log(log_file, "starting job: #{job}")
+      write_to_log(log_file, id, "starting job: #{job}")
       case job[:msg_type]
       when :FLAG_POSSIBLE_VIOLATION
         unless @processed_pages.has_key?(job[:page_url])
@@ -66,7 +66,7 @@ module DatabaseWorkerPool
           begin
             results = conn.query("INSERT INTO #{@violation_table_name} (`violation_date`, `url`, `title`, `recall_id`, `violation_status`) VALUES ('#{Time.now.strftime("%Y-%m-%d")}', '#{job[:page_title]}', '#{job[:page_url]}', #{job[:recall_id]}, 'Possible')")
           rescue Exception => e
-            write_to_log(log_file, "Could not insert record #{e}")
+            write_to_log(log_file, id, "Could not insert record #{e}")
           end
         end
       when :REFRESH_RECALLS
@@ -94,13 +94,13 @@ module DatabaseWorkerPool
             conn.query("INSERT INTO #{@recall_table_name} (  `recall_id`,    `recall_number`,   `high_priority`,   `date`,    `sortable_date`,    `recall_heading`,    `name_of_product`,    `description`,    `hazard`,    `remedy_type`,    `units`,    `conjunction_with`,    `incidents`,    `remedy`,    `sold_at`,    `distributors`,    `manufactured_in`) 
                                                    VALUES ('#{recall_id}', '#{recall_number}', #{high_priority}, '#{date}', '#{sortable_date}', '#{recall_heading}', '#{name_of_product}', '#{description}', '#{hazard}', '#{remedy_type}', '#{units}', '#{conjunction_with}', '#{incidents}', '#{remedy}', '#{sold_at}', '#{distributors}', '#{manufactured_in}')")
           rescue Exception => e
-            write_to_log(log_file, "Could not insert record #{e}")
+            write_to_log(log_file, id, "Could not insert record #{e}")
           end
         end
       else
       end
     end
-    write_to_log(log_file, "shutting down worker")
+    write_to_log(log_file, id, "shutting down worker")
     conn.close()
     log_file.close()
   end
@@ -154,7 +154,7 @@ module ScraperWorkerPool
         pref_hash['profile']['exit_type'] = ''
         File.write(pref_path, JSON.generate(pref_hash))
       rescue Exception => e
-        write_to_log(log_file, "could not edit preferences #{e}")
+        write_to_log(log_file, id, "could not edit preferences #{e}")
       end
     else
     end
@@ -182,7 +182,7 @@ module ScraperWorkerPool
       enable_chrome_headless_downloads(driver, @download_path)
       return driver
     rescue Exception => e
-      write_to_log(log_file, "could not create driver #{e}")
+      write_to_log(log_file, id, "could not create driver #{e}")
       return nil
     end
   end
@@ -293,17 +293,17 @@ module ScraperWorkerPool
   def self.worker(id, jobs, recalls)
     log_file = File.open("logs/scraper_worker_#{id}.log", 'w')
   
-    write_to_log(log_file, "creating scraper worker")
+    write_to_log(log_file, id, "creating scraper worker")
     driver = create_driver(id, log_file)
     jobs.each do |job|
-      write_to_log(log_file, "starting job: #{job}")
+      write_to_log(log_file, id, "starting job: #{job}")
       case job[:msg_type]
       when :REGISTER_RECALL
         register_recall(job[:recall], jobs, recalls, driver)
       when :IMAGE_SEARCH_LINKS
         google_image_search(driver: driver, image_url: job[:image_url])
         links = get_links(driver: driver, xpath: '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a')
-        write_to_log(log_file, "got links (length: #{links.length()})")
+        write_to_log(log_file, id, "got links (length: #{links.length()})")
         for link in links
           jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
           jobs << { msg_type: :SCRAPE_PAGE, recall_id: job[:recall_id], page_url: link, recurse_depth: 0 }
@@ -311,21 +311,22 @@ module ScraperWorkerPool
       when :PRODUCT_NAME_SEARCH_LINKS
         google_text_search(driver: driver, search_text: "#{job[:product_name]} for sale")
         links = get_links(driver: driver, xpath: '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a')
-        write_to_log(log_file, "got links (length: #{links.length()})")
+        write_to_log(log_file, id, "got links (length: #{links.length()})")
         for link in links
           jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
           jobs << { msg_type: :SCRAPE_PAGE, recall_id: job[:recall_id], page_url: link, recurse_depth: 0 }
         end
       when :CATEGORIZE_PAGE
         text = get_text(driver: driver, url: job[:page_url])
-        write_to_log(log_file, "got content (length: #{text.length()})")
+        write_to_log(log_file, id, "got content (length: #{text.length()})")
         if ContentAnalyzer::analyze(text, recalls[job[:recall_id]])
+          puts "adding job"
           DatabaseWorkerPool::add_job({ msg_type: :FLAG_POSSIBLE_VIOLATION, recall_id: job[:recall_id], page_url: job[:page_url], page_title: driver.title })
         end
       when :SCRAPE_PAGE
         if job[:recurse_depth] < @recurse_max_depth
           links = get_links(driver: driver, url: job[:page_url])
-          write_to_log(log_file, "got links (length: #{links.length()})")
+          write_to_log(log_file, id, "got links (length: #{links.length()})")
           for link in links
             if LinkAnalyzer::analyze(link, job[:page_url])
               jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
@@ -353,7 +354,7 @@ module ScraperWorkerPool
       end
     end
   
-    write_to_log(log_file, "shutting down worker")
+    write_to_log(log_file, id, "shutting down worker")
     driver.quit()
     log_file.close()
   end

@@ -38,12 +38,12 @@ end
 
 module ContentAnalyzer
   def self.configure(config)
-    @min_least_common_substring_length = config['minLeastCommonSubstringLength']
+    @min_least_common_substring_length = config['minLongestCommonSubstringLength']
     @for_sale_whitelist = config['forSaleWhitelist']
   end
 
   def self.longest_common_substring_length?(content, search)
-    table = Array.new(search.length, Array.new(content.length, 0))
+    table = Array.new(search.length) { Array.new(content.length, 0) }
     result = ''
     longest = 0
 
@@ -58,7 +58,7 @@ module ContentAnalyzer
       }
     }
 
-    # puts 'content analysis result: ' + result
+    puts "lcs analysis result (len #{longest}): #{result}"
     return longest >= @min_least_common_substring_length
   end
 
@@ -72,10 +72,11 @@ module ContentAnalyzer
 
   def self.analyze(content, recall)
     product_names = ( recall['Products'].map { |product| product['Name'] } ).join(" | ")
-
+    puts '1'
     return false unless longest_common_substring_length?(content, product_names)
+    puts '2'
     return false unless has_sale?(content)
-    
+    puts '3'
     return true
   end
 end
