@@ -17,7 +17,7 @@ end
 def write_to_log(file, message)
   time = Time.new
   timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-  puts "#{timestamp} | #{message}"
+  # puts "#{timestamp} | #{message}"
   file.puts("#{timestamp} | #{message}")
 end
 
@@ -339,7 +339,15 @@ module ScraperWorkerPool
         rescue Exception => e
           puts e
         end
-        DatabaseWorkerPool::add_job({ msg_type: :REFRESH_RECALLS, recall_csv_file_path: "#{@download_path}\\recalls_recall_listing.csv" })
+
+        csv_path = ''
+        if (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
+          csv_path = "#{@download_path}\\recalls_recall_listing.csv"
+        else
+          csv_path = "#{@download_path}/recalls_recall_listing.csv"
+        end
+        
+        DatabaseWorkerPool::add_job({ msg_type: :REFRESH_RECALLS, recall_csv_file_path:  })
       else
         # Do nothing for unrecognized msg_type
       end
