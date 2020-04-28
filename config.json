@@ -2,7 +2,6 @@
     "server" : {
         "production" : true,
         "port" : 80
-        
     },
     "databaseWorkerPool" : {
         "host" : "database1.cnsz4k4bv6u3.us-east-1.rds.amazonaws.com",
@@ -15,7 +14,7 @@
         "workerPoolSize" : 2
     },
     "scraperWorkerPool" : {
-        "chromedriverBinaryPath" : "bin/chromedriver.exe",
+        "chromedriverBinaryPath" : "bin/chromedriver",
         "adBlockerExtensionPath" : "selenium_data/adblocker_extension",
         "userDataPath" : "selenium_data",
         "downloadPath" : "selenium_data/temp",
