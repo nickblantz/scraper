@@ -1,27 +1,13 @@
 require 'concurrent-edge'
-require 'json'
-require 'csv'
-require 'selenium-webdriver'
-require 'mysql2'
-require 'net/http'
-require './utils/analyzers.rb'
-require './utils/recall.rb'
-
-class Integer
-  N_BYTES = [42].pack('i').size
-  N_BITS = N_BYTES * 16
-  MAX = 2 ** (N_BITS - 2) - 1
-  MIN = -MAX - 1
-end
-
-def write_to_log(file, id, message)
-  time = Time.new
-  timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-  # puts "#{timestamp} |#{id}| #{message}"
-  file.puts("#{timestamp} |#{id}| #{message}")
-end
+require './utils/logger.rb'
+require './utils/integer.rb'
 
 module DatabaseWorkerPool
+  require 'csv'
+  require 'mysql2'
+  require 'net/http'
+  require './utils/recall.rb'
+
   def self.configure(config)
     @host = config['host']
     @port = config['port']
@@ -32,8 +18,9 @@ module DatabaseWorkerPool
     @violation_table_name = config['violationTableName']
     @worker_pool_size = config['workerPoolSize']
     @jobs = Concurrent::Channel.new(buffer: :buffered, capacity: Integer::MAX)
+    @logger = WorkerLogger.new(config['logger'])
     @processed_pages = Hash.new()
-    
+
     (0...@worker_pool_size).each do |id|
       Concurrent::Channel.go { DatabaseWorkerPool::worker(id, @jobs) }
     end
@@ -44,6 +31,7 @@ module DatabaseWorkerPool
   end
 
   def self.create_connection(id)
+    @logger.log(id, "creating database worker")
     Mysql2::Client.new(
       host: @host,
       port: @port,
@@ -54,11 +42,10 @@ module DatabaseWorkerPool
   end
   
   def self.worker(id, jobs)
-    log_file = File.open("logs/database_worker_#{id}.log", 'w')
-    write_to_log(log_file, id, "creating database worker")
+    @logger.log(id, "creating database worker")
     conn = create_connection(id)
     jobs.each do |job|
-      write_to_log(log_file, id, "starting job: #{job}")
+      @logger.log(id, "starting job: #{job}")
       case job[:msg_type]
       when :FLAG_POSSIBLE_VIOLATION
         unless @processed_pages.has_key?(job[:page_url])
@@ -66,7 +53,7 @@ module DatabaseWorkerPool
           begin
             results = conn.query("INSERT INTO #{@violation_table_name} (`violation_date`, `url`, `title`, `recall_id`, `violation_status`) VALUES ('#{Time.now.strftime("%Y-%m-%d")}', '#{job[:page_title]}', '#{job[:page_url]}', #{job[:recall_id]}, 'Possible')")
           rescue Exception => e
-            write_to_log(log_file, id, "Could not insert record #{e}")
+            @logger.log(id, "Could not insert record #{e}")
           end
         end
       when :REFRESH_RECALLS
@@ -74,10 +61,10 @@ module DatabaseWorkerPool
         csv.each_with_index do |recall, i|
           next if i == 0
           recall_number = recall[0].gsub(/-/, '')
-          recall_id = get_recall_by(recall_number: recall_number)['RecallID']
+          recall_id = Recall::get_recall_by(recall_number: recall_number)['RecallID']
           high_priority = 0
           date = recall[1]
-          sortable_date = generate_sortable_date(date)
+          sortable_date = Recall::generate_sortable_date(date)
           recall_heading = recall[2]
           name_of_product = recall[3]
           description = recall[4]
@@ -94,31 +81,34 @@ module DatabaseWorkerPool
             conn.query("INSERT INTO #{@recall_table_name} (  `recall_id`,    `recall_number`,   `high_priority`,   `date`,    `sortable_date`,    `recall_heading`,    `name_of_product`,    `description`,    `hazard`,    `remedy_type`,    `units`,    `conjunction_with`,    `incidents`,    `remedy`,    `sold_at`,    `distributors`,    `manufactured_in`) 
                                                    VALUES ('#{recall_id}', '#{recall_number}', #{high_priority}, '#{date}', '#{sortable_date}', '#{recall_heading}', '#{name_of_product}', '#{description}', '#{hazard}', '#{remedy_type}', '#{units}', '#{conjunction_with}', '#{incidents}', '#{remedy}', '#{sold_at}', '#{distributors}', '#{manufactured_in}')")
           rescue Exception => e
-            write_to_log(log_file, id, "Could not insert record #{e}")
+            @logger.log(id, "Could not insert record #{e}")
           end
         end
       else
       end
     end
-    write_to_log(log_file, id, "shutting down worker")
+    @logger.log(id, "shutting down worker")
     conn.close()
-    log_file.close()
+    @logger.close()
   end
 end
 
 module ScraperWorkerPool
+  require 'selenium-webdriver'
+  require './utils/analyzers.rb'
+  
   def self.configure(config)
     @chromedriver_binary_path = "#{Dir.pwd}/#{config['chromedriverBinaryPath']}"
     @adblock_extension_path = "#{Dir.pwd}/#{config['adBlockerExtensionPath']}"
     @user_data_path = "#{Dir.pwd}/#{config['userDataPath']}"
-
     @download_path = "#{Dir.pwd}/#{config['downloadPath']}" # 
     @download_path.gsub!(/\//, '\\') if (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
     @recurse_max_depth = config['recurseMaxDepth']
     @worker_pool_size = config['workerPoolSize']
     @jobs = Concurrent::Channel.new(buffer: :buffered, capacity: Integer::MAX)
+    @logger = WorkerLogger.new(config['logger'])
     @recalls = Hash.new
-    
+
     (0...@worker_pool_size).each do |id|
       Concurrent::Channel.go { ScraperWorkerPool::worker(id, @jobs, @recalls) }
     end
@@ -128,7 +118,7 @@ module ScraperWorkerPool
     @jobs << job
   end
 
-  def self.enable_chrome_headless_downloads(driver, directory)
+  def self.enable_chrome_headless_downloads(id, driver, directory)
     begin
       bridge = driver.send(:bridge)
       bridge.http.call(:post, "/session/#{bridge.session_id}/chromium/send_command", {
@@ -139,11 +129,11 @@ module ScraperWorkerPool
         }
       })
     rescue Exception => e
-      puts e
+      @logger.log(id, "Error sending send_command http to chrome")
     end
   end
 
-  def self.create_driver(id, log_file)
+  def self.create_driver(id)
     user_data_dir = "#{@user_data_path}/user_data_#{id}"
   
     if Dir.exist?(user_data_dir)
@@ -154,7 +144,7 @@ module ScraperWorkerPool
         pref_hash['profile']['exit_type'] = ''
         File.write(pref_path, JSON.generate(pref_hash))
       rescue Exception => e
-        write_to_log(log_file, id, "could not edit preferences #{e}")
+        @logger.log(id, "could not edit preferences #{e}")
       end
     else
     end
@@ -179,10 +169,10 @@ module ScraperWorkerPool
         default_directory: @download_path
       )
       driver = Selenium::WebDriver.for(:chrome, options: options, driver_path: @chromedriver_binary_path)
-      enable_chrome_headless_downloads(driver, @download_path)
+      enable_chrome_headless_downloads(id, driver, @download_path)
       return driver
     rescue Exception => e
-      write_to_log(log_file, id, "could not create driver #{e}")
+      @logger.log(id, "could not create driver #{e}")
       return nil
     end
   end
@@ -291,42 +281,45 @@ module ScraperWorkerPool
   end
   
   def self.worker(id, jobs, recalls)
-    log_file = File.open("logs/scraper_worker_#{id}.log", 'w')
-  
-    write_to_log(log_file, id, "creating scraper worker")
-    driver = create_driver(id, log_file)
+    @logger.log(id, "creating scraper worker")
+    driver = create_driver(id)
+
     jobs.each do |job|
-      write_to_log(log_file, id, "starting job: #{job}")
+      @logger.log(id, "starting job: #{job}")
       case job[:msg_type]
       when :REGISTER_RECALL
         register_recall(job[:recall], jobs, recalls, driver)
+
       when :IMAGE_SEARCH_LINKS
+
         google_image_search(driver: driver, image_url: job[:image_url])
         links = get_links(driver: driver, xpath: '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a')
-        write_to_log(log_file, id, "got links (length: #{links.length()})")
+        @logger.log(id, "got links (length: #{links.length()})")
         for link in links
           jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
           jobs << { msg_type: :SCRAPE_PAGE, recall_id: job[:recall_id], page_url: link, recurse_depth: 0 }
         end
+
       when :PRODUCT_NAME_SEARCH_LINKS
         google_text_search(driver: driver, search_text: "#{job[:product_name]} for sale")
         links = get_links(driver: driver, xpath: '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a')
-        write_to_log(log_file, id, "got links (length: #{links.length()})")
+        @logger.log(id, "got links (length: #{links.length()})")
         for link in links
           jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
           jobs << { msg_type: :SCRAPE_PAGE, recall_id: job[:recall_id], page_url: link, recurse_depth: 0 }
         end
+
       when :CATEGORIZE_PAGE
         text = get_text(driver: driver, url: job[:page_url])
-        write_to_log(log_file, id, "got content (length: #{text.length()})")
+        @logger.log(id, "got content (length: #{text.length()})")
         if ContentAnalyzer::analyze(text, recalls[job[:recall_id]])
-          puts "adding job"
           DatabaseWorkerPool::add_job({ msg_type: :FLAG_POSSIBLE_VIOLATION, recall_id: job[:recall_id], page_url: job[:page_url], page_title: driver.title })
         end
+
       when :SCRAPE_PAGE
         if job[:recurse_depth] < @recurse_max_depth
           links = get_links(driver: driver, url: job[:page_url])
-          write_to_log(log_file, id, "got links (length: #{links.length()})")
+          @logger.log(id, "got links (length: #{links.length()})")
           for link in links
             if LinkAnalyzer::analyze(link, job[:page_url])
               jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
@@ -334,28 +327,19 @@ module ScraperWorkerPool
             end
           end
         end
-      when :DOWNLOAD_RECALLS_CSV
-        begin
-          driver.navigate.to('https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-CSV')
-        rescue Exception => e
-          puts e
-        end
 
-        csv_path = ''
-        if (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
-          csv_path = "#{@download_path}\\recalls_recall_listing.csv"
-        else
-          csv_path = "#{@download_path}/recalls_recall_listing.csv"
-        end
-        
+      when :DOWNLOAD_RECALLS_CSV
+        driver.navigate.to('https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-CSV')
+        csv_path = ((/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil) ? "#{@download_path}\\recalls_recall_listing.csv" : "#{@download_path}/recalls_recall_listing.csv"
         DatabaseWorkerPool::add_job({ msg_type: :REFRESH_RECALLS, recall_csv_file_path: csv_path })
+
       else
-        # Do nothing for unrecognized msg_type
+        @logger.log(id, 'could not download recalls csv')
       end
     end
   
-    write_to_log(log_file, id, "shutting down worker")
+    @logger.log(id, 'shutting down worker')
     driver.quit()
-    log_file.close()
+    @logger.close()
   end
 end

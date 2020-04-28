@@ -11,7 +11,11 @@
         "databaseName" : "database1",
         "recallTableName" : "fullrecallapi",
         "violationTableName" : "Violation",
-        "workerPoolSize" : 2
+        "workerPoolSize" : 2,
+        "logger" : {
+            "logFile" : "logs/database_pool.log",
+            "flushInterval" : 5
+        }
     },
     "scraperWorkerPool" : {
         "chromedriverBinaryPath" : "bin/chromedriver",
@@ -19,7 +23,11 @@
         "userDataPath" : "selenium_data",
         "downloadPath" : "selenium_data/temp",
         "recurseMaxDepth" : 2,
-        "workerPoolSize" : 64
+        "workerPoolSize" : 20,
+        "logger" : {
+            "logFile" : "logs/scraper_pool.log",
+            "flushInterval" : 40
+        }
     },
     "linkAnalyzer" : {
         "hostWhitelist" : [
