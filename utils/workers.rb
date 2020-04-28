@@ -42,7 +42,6 @@ module DatabaseWorkerPool
   end
   
   def self.worker(id, jobs)
-    @logger.log(id, "creating database worker")
     conn = create_connection(id)
     jobs.each do |job|
       @logger.log(id, "starting job: #{job}")
