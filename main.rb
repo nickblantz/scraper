@@ -22,7 +22,7 @@ before do
   response.headers['Access-Control-Allow-Origin'] = '*'
 end
 
-get '/scrape_recall/:recall_id' do |recall_id|
+post '/scrape_recall/:recall_id' do |recall_id|
   ScraperWorkerPool::add_job({ msg_type: :REGISTER_RECALL, recall: get_recall_by(recall_id: recall_id) })
   return "scraping recall #{recall_id}"
 end
