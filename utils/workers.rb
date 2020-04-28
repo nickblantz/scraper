@@ -112,7 +112,9 @@ module ScraperWorkerPool
     @chromedriver_binary_path = "#{Dir.pwd}/#{config['chromedriverBinaryPath']}"
     @adblock_extension_path = "#{Dir.pwd}/#{config['adBlockerExtensionPath']}"
     @user_data_path = "#{Dir.pwd}/#{config['userDataPath']}"
-    @download_path = "#{Dir.pwd}/#{config['downloadPath']}" # .gsub!(/\//, '\\')
+
+    @download_path = "#{Dir.pwd}/#{config['downloadPath']}" # 
+    @download_path.gsub!(/\//, '\\') if (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
     @recurse_max_depth = config['recurseMaxDepth']
     @worker_pool_size = config['workerPoolSize']
     @jobs = Concurrent::Channel.new(buffer: :buffered, capacity: Integer::MAX)
