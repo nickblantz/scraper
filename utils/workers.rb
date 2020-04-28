@@ -17,7 +17,7 @@ end
 def write_to_log(file, message)
   time = Time.new
   timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-  # puts "#{timestamp} | #{message}"
+  puts "#{timestamp} | #{message}"
   file.puts("#{timestamp} | #{message}")
 end
 

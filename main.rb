@@ -29,7 +29,6 @@ end
 
 get '/refresh_recalls' do
   ScraperWorkerPool::add_job({ msg_type: :DOWNLOAD_RECALLS_CSV })
-  # DatabaseWorkerPool::add_job({ msg_type: :REFRESH_RECALLS })
-  return 'refreshing regalls'
+  return 'refreshing recalls'
 end
 

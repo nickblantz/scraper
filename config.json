@@ -20,7 +20,7 @@
         "userDataPath" : "selenium_data",
         "downloadPath" : "selenium_data/temp",
         "recurseMaxDepth" : 2,
-        "workerPoolSize" : 8
+        "workerPoolSize" : 64
     },
     "linkAnalyzer" : {
         "hostWhitelist" : [
