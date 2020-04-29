@@ -50,7 +50,7 @@ module DatabaseWorkerPool
         unless @processed_pages.has_key?(job[:page_url])
           @processed_pages[job[:page_url]] = true
           begin
-            results = conn.query("INSERT INTO #{@violation_table_name} (`violation_date`, `url`, `title`, `recall_id`, `violation_status`) VALUES ('#{Time.now.strftime("%Y-%m-%d")}', '#{job[:page_title]}', '#{job[:page_url]}', #{job[:recall_id]}, 'Possible')")
+            results = conn.query("INSERT INTO #{@violation_table_name} (`violation_date`, `url`, `title`, `recall_id`, `violation_status`) VALUES ('#{Time.now.strftime("%Y-%m-%d")}', '#{job[:page_url]}', '#{job[:page_title]}', #{job[:recall_id]}, 'Possible')")
           rescue Exception => e
             @logger.log(id, "Could not insert record #{e}")
           end
