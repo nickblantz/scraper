@@ -3,19 +3,23 @@ module Recall
   require 'net/http'
 
   def self.get_recall_by(recall_id: nil, recall_number: nil)
-    unless recall_id.nil?
-      uri = URI("https://www.saferproducts.gov/RestWebServices/Recall?RecallID=#{recall_id}&format=json")
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = true
-      request = http.get(uri.request_uri)
-      return (JSON.parse request.body)[0]
-    end
-    unless recall_number.nil?
-      uri = URI("https://www.saferproducts.gov/RestWebServices/Recall?RecallNumber=#{recall_number}&format=json")
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = true
-      request = http.get(uri.request_uri)
-      return (JSON.parse request.body)[0]
+    begin
+      unless recall_id.nil?
+        uri = URI("https://www.saferproducts.gov/RestWebServices/Recall?RecallID=#{recall_id}&format=json")
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = true
+        request = http.get(uri.request_uri)
+        return (JSON.parse request.body)[0]
+      end
+      unless recall_number.nil?
+        uri = URI("https://www.saferproducts.gov/RestWebServices/Recall?RecallNumber=#{recall_number}&format=json")
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = true
+        request = http.get(uri.request_uri)
+        return (JSON.parse request.body)[0]
+      end
+    rescue Exception => e
+      puts e
     end
   end
 

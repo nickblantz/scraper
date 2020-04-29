@@ -11,10 +11,10 @@
         "databaseName" : "database1",
         "recallTableName" : "fullrecallapi",
         "violationTableName" : "Violation",
-        "workerPoolSize" : 2,
+        "workerPoolSize" : 4,
         "logger" : {
             "logFile" : "logs/database_pool.log",
-            "flushInterval" : 5
+            "flushInterval" : 4
         }
     },
     "scraperWorkerPool" : {
@@ -23,7 +23,7 @@
         "userDataPath" : "selenium_data",
         "downloadPath" : "selenium_data/temp",
         "recurseMaxDepth" : 2,
-        "workerPoolSize" : 20,
+        "workerPoolSize" : 40,
         "logger" : {
             "logFile" : "logs/scraper_pool.log",
             "flushInterval" : 40

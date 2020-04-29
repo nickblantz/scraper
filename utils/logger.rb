@@ -14,7 +14,7 @@ class WorkerLogger
   def log(id, message)
     begin
       timestamp = (Time.new).strftime("%Y-%m-%d %H:%M:%S")
-      # puts "#{timestamp} |#{id}| #{message}"
+      puts "#{timestamp} |#{id}| #{message}"
       @log_file.puts("#{timestamp} |#{id}| #{message}")
       @flush_counter.increment(1)
     rescue Exception => e 
