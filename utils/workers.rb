@@ -282,61 +282,63 @@ module ScraperWorkerPool
   def self.worker(id, jobs, recalls)
     @logger.log(id, "creating scraper worker")
     driver = create_driver(id)
+    begin
+      jobs.each do |job|
+        @logger.log(id, "starting job: #{job}")
+        case job[:msg_type]
+        when :REGISTER_RECALL
+          register_recall(job[:recall], jobs, recalls, driver)
 
-    jobs.each do |job|
-      @logger.log(id, "starting job: #{job}")
-      case job[:msg_type]
-      when :REGISTER_RECALL
-        register_recall(job[:recall], jobs, recalls, driver)
+        when :IMAGE_SEARCH_LINKS
 
-      when :IMAGE_SEARCH_LINKS
-
-        google_image_search(driver: driver, image_url: job[:image_url])
-        links = get_links(driver: driver, xpath: '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a')
-        @logger.log(id, "got links (length: #{links.length()})")
-        for link in links
-          jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
-          jobs << { msg_type: :SCRAPE_PAGE, recall_id: job[:recall_id], page_url: link, recurse_depth: 0 }
-        end
-
-      when :PRODUCT_NAME_SEARCH_LINKS
-        google_text_search(driver: driver, search_text: "#{job[:product_name]} for sale")
-        links = get_links(driver: driver, xpath: '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a')
-        @logger.log(id, "got links (length: #{links.length()})")
-        for link in links
-          jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
-          jobs << { msg_type: :SCRAPE_PAGE, recall_id: job[:recall_id], page_url: link, recurse_depth: 0 }
-        end
-
-      when :CATEGORIZE_PAGE
-        text = get_text(driver: driver, url: job[:page_url])
-        @logger.log(id, "got content (length: #{text.length()})")
-        if ContentAnalyzer::analyze(text, recalls[job[:recall_id]])
-          DatabaseWorkerPool::add_job({ msg_type: :FLAG_POSSIBLE_VIOLATION, recall_id: job[:recall_id], page_url: job[:page_url], page_title: driver.title })
-        end
-
-      when :SCRAPE_PAGE
-        if job[:recurse_depth] < @recurse_max_depth
-          links = get_links(driver: driver, url: job[:page_url])
+          google_image_search(driver: driver, image_url: job[:image_url])
+          links = get_links(driver: driver, xpath: '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a')
           @logger.log(id, "got links (length: #{links.length()})")
           for link in links
-            if LinkAnalyzer::analyze(link, job[:page_url])
-              jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
-              jobs << { msg_type: :SCRAPE_PAGE, recall_id: job[:recall_id], page_url: link, recurse_depth: job[:recurse_depth] + 1 }
+            jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
+            jobs << { msg_type: :SCRAPE_PAGE, recall_id: job[:recall_id], page_url: link, recurse_depth: 0 }
+          end
+
+        when :PRODUCT_NAME_SEARCH_LINKS
+          google_text_search(driver: driver, search_text: "#{job[:product_name]} for sale")
+          links = get_links(driver: driver, xpath: '//div[@id="search"]//div[@id="rso"]/div[contains(@class, "g")]/div[contains(@class, "rc")]/div[contains(@class, "r")]/a')
+          @logger.log(id, "got links (length: #{links.length()})")
+          for link in links
+            jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
+            jobs << { msg_type: :SCRAPE_PAGE, recall_id: job[:recall_id], page_url: link, recurse_depth: 0 }
+          end
+
+        when :CATEGORIZE_PAGE
+          text = get_text(driver: driver, url: job[:page_url])
+          @logger.log(id, "got content (length: #{text.length()})")
+          if ContentAnalyzer::analyze(text, recalls[job[:recall_id]])
+            DatabaseWorkerPool::add_job({ msg_type: :FLAG_POSSIBLE_VIOLATION, recall_id: job[:recall_id], page_url: job[:page_url], page_title: driver.title })
+          end
+
+        when :SCRAPE_PAGE
+          if job[:recurse_depth] < @recurse_max_depth
+            links = get_links(driver: driver, url: job[:page_url])
+            @logger.log(id, "got links (length: #{links.length()})")
+            for link in links
+              if LinkAnalyzer::analyze(link, job[:page_url])
+                jobs << { msg_type: :CATEGORIZE_PAGE, recall_id: job[:recall_id], page_url: link }
+                jobs << { msg_type: :SCRAPE_PAGE, recall_id: job[:recall_id], page_url: link, recurse_depth: job[:recurse_depth] + 1 }
+              end
             end
           end
+
+        when :DOWNLOAD_RECALLS_CSV
+          driver.navigate.to('https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-CSV')
+          csv_path = ((/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil) ? "#{@download_path}\\recalls_recall_listing.csv" : "#{@download_path}/recalls_recall_listing.csv"
+          DatabaseWorkerPool::add_job({ msg_type: :REFRESH_RECALLS, recall_csv_file_path: csv_path })
+
+        else
+          @logger.log(id, 'unrecognized msg_type')
         end
-
-      when :DOWNLOAD_RECALLS_CSV
-        driver.navigate.to('https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-CSV')
-        csv_path = ((/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil) ? "#{@download_path}\\recalls_recall_listing.csv" : "#{@download_path}/recalls_recall_listing.csv"
-        DatabaseWorkerPool::add_job({ msg_type: :REFRESH_RECALLS, recall_csv_file_path: csv_path })
-
-      else
-        @logger.log(id, 'could not download recalls csv')
       end
+    rescue Exception => e
+      @logger.log(id, 'WORKER_EXCEPTION: ' + e)
     end
-  
     @logger.log(id, 'shutting down worker')
     driver.quit()
     @logger.close()

@@ -6,8 +6,8 @@ module LinkAnalyzer
   end
 
   def self.same_page?(uri, page)
-    result = uri.clone()
-    result.fragment = nil
+    temp = uri.clone()
+    temp.fragment = nil
     return result.to_s == page
   end
 
@@ -30,6 +30,7 @@ module LinkAnalyzer
       return false unless accepted_host?(link_uri)
       return false unless whitelist_contains?(link_uri)
     rescue Exception => e
+      puts 'Link Analyzer Error: ' + e 
       return false
     end
     return true
@@ -70,10 +71,14 @@ module ContentAnalyzer
   end
 
   def self.analyze(content, recall)
-    product_names = ( recall['Products'].map { |product| product['Name'] } ).join(" | ")
-    
-    return false unless longest_common_substring_length?(content, product_names)
-    return false unless has_sale?(content)
+    begin
+      product_names = ( recall['Products'].map { |product| product['Name'] } ).join(" | ")
+      return false unless longest_common_substring_length?(content, product_names)
+      return false unless has_sale?(content)
+    rescue Exception => e
+      puts 'Link Content Error: ' + e 
+      return false
+    end
     return true
   end
 end
