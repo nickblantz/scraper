@@ -9,14 +9,26 @@ module Recall
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = true
         request = http.get(uri.request_uri)
-        return (JSON.parse request.body)[0]
+        json = JSON.parse request.body
+        unless json.length.zero?
+          return json[0]
+        else
+          puts "Could not get recall for { recall_id: #{recall_id} }"
+          return nil
+        end
       end
       unless recall_number.nil?
         uri = URI("https://www.saferproducts.gov/RestWebServices/Recall?RecallNumber=#{recall_number}&format=json")
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = true
         request = http.get(uri.request_uri)
-        return (JSON.parse request.body)[0]
+        json = JSON.parse request.body
+        if json.length.zero?
+          puts "Could not get recall for { recall_number: #{recall_number} }"
+          return nil
+        else
+          return json[0]
+        end
       end
     rescue Exception => e
       puts e

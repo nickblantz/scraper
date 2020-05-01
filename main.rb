@@ -1,34 +1,42 @@
 require 'json'
-require 'sinatra'
+require 'sinatra/base'
 require 'sinatra/cross_origin'
-require './utils/analyzers.rb'
-require './utils/recall.rb'
-require './utils/workers.rb'
+require './lib/analyzers/content.rb'
+require './lib/analyzers/link.rb'
+require './lib/resources/connection.rb'
+require './lib/resources/driver.rb'
+require './lib/recall.rb'
+require './lib/worker_pool.rb'
 
-config = JSON.parse(File.read('config.json'))
-DatabaseWorkerPool::configure(config['databaseWorkerPool'])
-ScraperWorkerPool::configure(config['scraperWorkerPool'])
-ContentAnalyzer::configure(config['contentAnalyzer'])
-LinkAnalyzer::configure(config['linkAnalyzer'])
+module Sinatra
+  class ScraperApp < Sinatra::Base
+    configure do
+      config = JSON.parse(File.read('config.json'))
+      ConnectionResources::configure(config['connectionResources'])
+      DriverResources::configure(config['driverResources'])
+      WorkerPool::configure(config['workerPool'])
+      ContentAnalyzer::configure(config['contentAnalyzer'])
+      LinkAnalyzer::configure(config['linkAnalyzer'])
 
-set :bind, '*' if config['server']['production']
-set :port, config['server']['port']
+      enable :cross_origin
+      set :bind, '*' if config['server']['production']
+      set :port, config['server']['port']
+    end
 
-configure do
-  enable :cross_origin
+    before do
+      response.headers['Access-Control-Allow-Origin'] = '*'
+    end
+
+    get '/scrape_recall/:recall_id' do |recall_id|
+      WorkerPool::queue_job(WorkerPool::Job.new(:REGISTER_RECALL, { recall: Recall::get_recall_by(recall_id: recall_id) }))
+      return "scraping recall #{recall_id}"
+    end
+
+    get '/refresh_recalls' do
+      WorkerPool::queue_job(WorkerPool::Job.new(:DOWNLOAD_RECALLS_CSV, {}))
+      return 'refreshing recalls'
+    end
+
+    run! if __FILE__ == $0
+  end
 end
-
-before do
-  response.headers['Access-Control-Allow-Origin'] = '*'
-end
-
-post '/scrape_recall/:recall_id' do |recall_id|
-  ScraperWorkerPool::add_job({ msg_type: :REGISTER_RECALL, recall: Recall::get_recall_by(recall_id: recall_id) })
-  return "scraping recall #{recall_id}"
-end
-
-get '/refresh_recalls' do
-  ScraperWorkerPool::add_job({ msg_type: :DOWNLOAD_RECALLS_CSV })
-  return 'refreshing recalls'
-end
-

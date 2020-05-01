@@ -3,30 +3,42 @@
         "production" : true,
         "port" : 80
     },
-    "databaseWorkerPool" : {
+    "connectionResources" : {
         "host" : "database1.cnsz4k4bv6u3.us-east-1.rds.amazonaws.com",
         "port" : "3306",
         "username" : "masterusername",
         "password" : "masterpassword",
         "databaseName" : "database1",
-        "recallTableName" : "fullrecallapi",
-        "violationTableName" : "Violation",
-        "workerPoolSize" : 4,
+        "poolSize" : 2,
+        "logUsageInterval" : 10,
         "logger" : {
-            "logFile" : "logs/database_pool.log",
+            "standardOut" : false,
+            "logFile" : "logs/connection_resources.log",
             "flushInterval" : 4
         }
     },
-    "scraperWorkerPool" : {
+    "driverResources" : {
         "chromedriverBinaryPath" : "bin/chromedriver",
         "adBlockerExtensionPath" : "selenium_data/adblocker_extension",
         "userDataPath" : "selenium_data",
         "downloadPath" : "selenium_data/temp",
-        "recurseMaxDepth" : 2,
-        "workerPoolSize" : 40,
+        "poolSize" : 12,
+        "logUsageInterval" : 10,
         "logger" : {
-            "logFile" : "logs/scraper_pool.log",
-            "flushInterval" : 40
+            "standardOut" : false,
+            "logFile" : "logs/driver_resources.log",
+            "flushInterval" : 24
+        }
+    },
+    "workerPool" : {
+        "downloadPath" : "selenium_data/temp",
+        "recurseMaxDepth" : 2,
+        "poolSize" : 24,
+        "cleanUpInterval" : 3,
+        "logger" : {
+            "standardOut" : false,
+            "logFile" : "logs/worker_pool.log",
+            "flushInterval" : 48
         }
     },
     "linkAnalyzer" : {

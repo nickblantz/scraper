@@ -1,41 +1,44 @@
 require 'concurrent-edge'
 
-class WorkerLogger
+class PoolLogger
   def initialize(config)
     begin
+      @standard_out = config['standardOut']
       @flush_interval = config['flushInterval']
       @flush_counter = Concurrent::AtomicFixnum.new(0)
       @log_file = File.open("#{Dir.pwd}/#{config['logFile']}", 'w')
     rescue Exception => e
-      puts e.inspect
+      puts e
     end
   end
 
-  def log(id, message)
+  def log(message)
     begin
       timestamp = (Time.new).strftime("%Y-%m-%d %H:%M:%S")
-      puts "#{timestamp} |#{id}| #{message}"
-      @log_file.puts("#{timestamp} |#{id}| #{message}")
+      thread_id = Thread.current.object_id
+      puts "[#{timestamp}] [#{thread_id}] #{message}" if @standard_out
+      @log_file.puts("[#{timestamp}] [#{thread_id}] #{message}")
       @flush_counter.increment(1)
     rescue Exception => e 
       puts e
     end
 
     if @flush_counter.value >= @flush_interval
-      self.flush()
+      self.flush
     end
   end
 
-  def flush()
+  def flush
     begin
       @flush_counter.value = 0
-      @log_file.flush()
+      @log_file.flush
     rescue Exception => e
       puts e
     end
   end
 
-  def close()
-    @log_file.close()
+  def close
+    self.flush
+    @log_file.close
   end
 end
