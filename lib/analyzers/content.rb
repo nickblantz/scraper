@@ -1,9 +1,29 @@
 module ContentAnalyzer
-  def self.configure(config)
-    @min_least_common_substring_length = config['minLongestCommonSubstringLength']
+  def self.configure(config, logger)
+    @logger = logger
     @for_sale_whitelist = config['forSaleWhitelist']
+    @min_least_common_substring_length = config['minLongestCommonSubstringLength']
+    @logger.info 'Content analyzer configured'
+    @configured = true
   end
 
+  def self.analyze(content, recall)
+    begin
+      product_names = ( recall['Products'].map { |product| product['Name'] } ).join(" | ")
+      return false unless longest_common_substring_length?(content, product_names)
+      return false unless has_sale?(content)
+    rescue Exception => e
+      @logger.error 'Could not analyze content'
+      @logger.debug e.to_s
+      @logger.trace e
+      return false
+    end
+    @logger.info "Content analysis succeeded"
+    return true
+  end
+
+  private
+  
   def self.longest_common_substring_length?(content, search)
     table = Array.new(search.length) { Array.new(content.length, 0) }
     result = ''
@@ -20,8 +40,10 @@ module ContentAnalyzer
       }
     }
 
-    puts "lcs result : #{result}" 
-    return longest >= @min_least_common_substring_length
+    if longest >= @min_least_common_substring_length
+      @logger.debug "Least common sunstring succeeded for: #{result}" 
+      return true
+    end
   end
 
   def self.has_sale?(content)
@@ -30,17 +52,5 @@ module ContentAnalyzer
     end
     
     return false
-  end
-
-  def self.analyze(content, recall)
-    begin
-      product_names = ( recall['Products'].map { |product| product['Name'] } ).join(" | ")
-      return false unless longest_common_substring_length?(content, product_names)
-      return false unless has_sale?(content)
-    rescue Exception => e
-      puts "error analyzing content #{e}" 
-      return false
-    end
-    return true
   end
 end

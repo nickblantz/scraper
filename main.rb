@@ -3,20 +3,28 @@ require 'sinatra/base'
 require 'sinatra/cross_origin'
 require './lib/analyzers/content.rb'
 require './lib/analyzers/link.rb'
+require './lib/logger.rb'
 require './lib/resources/connection.rb'
 require './lib/resources/driver.rb'
-require './lib/recall.rb'
+require './lib/utils/connection.rb'
+require './lib/utils/driver.rb'
+require './lib/utils/recall.rb'
 require './lib/worker_pool.rb'
 
 module Sinatra
   class ScraperApp < Sinatra::Base
     configure do
-      config = JSON.parse(File.read('config.json'))
-      ConnectionResources::configure(config['connectionResources'])
-      DriverResources::configure(config['driverResources'])
-      WorkerPool::configure(config['workerPool'])
-      ContentAnalyzer::configure(config['contentAnalyzer'])
-      LinkAnalyzer::configure(config['linkAnalyzer'])
+      config = JSON.parse(File.read('config.json')).freeze
+      logger = AppLogger.new(config['logger'])
+
+      ContentAnalyzer::configure(config['contentAnalyzer'], logger)
+      LinkAnalyzer::configure(config['linkAnalyzer'], logger)
+      ConnectionResources::configure(config['connectionResources'], logger)
+      DriverResources::configure(config['driverResources'], logger)
+      ConnectionUtils::configure(logger)
+      DriverUtils::configure(logger)
+      RecallUtils::configure(logger)
+      WorkerPool::configure(config['workerPool'], logger)
 
       enable :cross_origin
       set :bind, '*' if config['server']['production']
@@ -28,7 +36,7 @@ module Sinatra
     end
 
     get '/scrape_recall/:recall_id' do |recall_id|
-      WorkerPool::queue_job(WorkerPool::Job.new(:REGISTER_RECALL, { recall: Recall::get_recall_by(recall_id: recall_id) }))
+      WorkerPool::queue_job(WorkerPool::Job.new(:REGISTER_RECALL, { recall: RecallUtils::get_recall_by(recall_id: recall_id) }))
       return "scraping recall #{recall_id}"
     end
 

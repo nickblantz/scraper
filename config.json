@@ -1,7 +1,15 @@
 {
     "server" : {
-        "production" : true,
-        "port" : 80
+        "production" : false,
+        "port" : 4567
+    },
+    "logger" : {
+        "standardOut" : true,
+        "logFile" : "logs/scraper_app.log",
+        "flushInterval" : 50,
+        "logLevels" : [
+            "ERROR"
+        ]
     },
     "connectionResources" : {
         "host" : "database1.cnsz4k4bv6u3.us-east-1.rds.amazonaws.com",
@@ -10,12 +18,8 @@
         "password" : "masterpassword",
         "databaseName" : "database1",
         "poolSize" : 2,
-        "logUsageInterval" : 10,
-        "logger" : {
-            "standardOut" : false,
-            "logFile" : "logs/connection_resources.log",
-            "flushInterval" : 4
-        }
+        "logUsageInterval" : 10
+        
     },
     "driverResources" : {
         "chromedriverBinaryPath" : "bin/chromedriver",
@@ -23,23 +27,13 @@
         "userDataPath" : "selenium_data",
         "downloadPath" : "selenium_data/temp",
         "poolSize" : 12,
-        "logUsageInterval" : 10,
-        "logger" : {
-            "standardOut" : false,
-            "logFile" : "logs/driver_resources.log",
-            "flushInterval" : 24
-        }
+        "logUsageInterval" : 10
     },
     "workerPool" : {
         "downloadPath" : "selenium_data/temp",
-        "recurseMaxDepth" : 2,
-        "poolSize" : 24,
-        "cleanUpInterval" : 3,
-        "logger" : {
-            "standardOut" : false,
-            "logFile" : "logs/worker_pool.log",
-            "flushInterval" : 48
-        }
+        "maxRecurseDepth" : 2,
+        "poolSize" : 12,
+        "cleanUpInterval" : 10
     },
     "linkAnalyzer" : {
         "hostWhitelist" : [

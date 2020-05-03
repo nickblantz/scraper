@@ -1,28 +1,64 @@
 module DriverResources
   require 'concurrent-edge'
   require 'selenium-webdriver'
-  require './lib/logger.rb'
 
   Resource = Struct.new(:id, :utilized, :driver)
 
-  def self.configure(config)
-    @configured = true
+  def self.configure(config, logger)
+    @logger = logger
     @chromedriver_binary_path = "#{Dir.pwd}/#{config['chromedriverBinaryPath']}"
     @adblock_extension_path = "#{Dir.pwd}/#{config['adBlockerExtensionPath']}"
     @user_data_path = "#{Dir.pwd}/#{config['userDataPath']}"
     @download_path = "#{Dir.pwd}/#{config['downloadPath']}"
     @download_path.gsub!(/\//, '\\') if (/cygwin|mswin|mingw|bccwin|wince|emx/ =~ RUBY_PLATFORM) != nil
     @pool_size = config['poolSize']
-    @logger = PoolLogger.new(config['logger'])
     @resources = Concurrent::Array.new(@pool_size) { |id| Resource.new(id, false, create_driver(id)) }
 
-    task = Concurrent::TimerTask.new(run_now: true, execution_interval: config['usageLogInterval']) do
+    task = Concurrent::TimerTask.new(run_now: true, execution_interval: config['logUsageInterval']) do
       in_use = @resources.count { |r| r.utilized }
       free = @pool_size - in_use
-      @logger.log "[USAGE STATS] In Use Drivers (#{in_use}) | Free Drivers (#{free})"
+      @logger.debug "[USAGE STATS] In Use Drivers (#{in_use}) | Free Drivers (#{free})"
     end
     task.execute
+
+    @logger.info 'Selenium Driver pool configured'
+    @logger.debug @resources.inspect
+    @configured = true
   end
+
+  def self.get
+    return nil unless @configured
+    while true
+      @resources.each do |resource|
+        unless resource.utilized
+          resource.utilized = true
+          @logger.debug "Got ownership of driver #{resource.id}"
+          return resource
+        end
+      end
+      sleep 1
+    end
+  end
+
+  def self.relinquish(resource)
+    @resources[resource.id].utilized = false
+    @logger.debug "Relinquished ownership of driver #{resource.id}"
+  end
+
+  def self.with_driver(message, &block)
+    driver_resource = get()
+    begin 
+      yield driver_resource.driver
+    rescue Exception => e
+      @logger.error "Could not #{message}"
+      @logger.debug e.to_s
+      @logger.trace e
+    ensure
+      relinquish(driver_resource)
+    end
+  end
+
+  private
 
   def self.enable_chrome_headless_downloads(id, driver, directory)
     begin
@@ -35,12 +71,13 @@ module DriverResources
         }
       })
     rescue Exception => e
-      @logger.log "Error sending send_command http to chrome"
+      @logger.error 'Could not enable downloads in headless chrome'
+      @logger.debug e.to_s
+      @logger.trace e
     end
   end
 
   def self.create_driver(id)
-    @logger.log "creating webdriver"  
     user_data_dir = "#{@user_data_path}/user_data_#{id}"
     options = Selenium::WebDriver::Chrome::Options.new
     
@@ -78,35 +115,21 @@ module DriverResources
       pref_hash['profile']['exit_type'] = ''
       File.write(pref_path, JSON.generate(pref_hash))
     rescue Exception => e
-      @logger.log "could not edit preferences #{e}"
+      @logger.error 'Could not edit preferences'
+      @logger.debug e.to_s
+      @logger.trace e
     end
     
     begin
       driver = Selenium::WebDriver.for(:chrome, options: options)
       enable_chrome_headless_downloads(id, driver, @download_path)
+      @logger.info "Driver created"
       return driver
     rescue Exception => e
-      @logger.log "could not create driver #{e}"
+      @logger.error 'Could not create driver'
+      @logger.debug e.to_s
+      @logger.trace e
       return nil
     end
-  end
-
-  def self.get
-    return nil unless @configured
-    while true
-      (0..@pool_size).each do |id|
-        unless @resources[id].utilized
-          @resources[id].utilized = true
-          @logger.log "getting ownership of driver #{id}"
-          return @resources[id]
-        end
-      end
-      sleep 1
-    end
-  end
-
-  def self.relinquish(resource)
-    @resources[resource.id].utilized = false
-    @logger.log "relinquishing ownership of driver #{resource.id}"
   end
 end
