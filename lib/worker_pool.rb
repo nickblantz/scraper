@@ -180,7 +180,7 @@ module WorkerPool
     DriverResources::with_driver("categorize page #{payload[:page_url]}") do |driver|
       title, content = DriverUtils::get_title_and_content(driver: driver, url: payload[:page_url])
       if ContentAnalyzer::analyze(content, @registered_recalls[payload[:recall_id]])
-        screenshot_file = "#{Dir.pwd}/public/violation_images/#{(0...12).map { (65 + rand(26)).chr }.join}.png"
+        screenshot_file = "violation_images/#{(0...12).map { (65 + rand(26)).chr }.join}.png"
         WorkerPool::queue_job(Job.new(:SAVE_SCREENSHOT, { recall_id: payload[:recall_id], page_url: payload[:page_url], screenshot_file: screenshot_file }))
         WorkerPool::queue_job(Job.new(:FLAG_POSSIBLE_VIOLATION, { recall_id: payload[:recall_id], page_url: payload[:page_url], page_title: title, screenshot_file: screenshot_file }))
       end
@@ -200,7 +200,7 @@ module WorkerPool
 
   def self.save_screenshot(payload)
     DriverResources::with_driver('take screenshot') do |driver|
-      DriverUtils::take_screenshot(driver: driver, url: payload[:page_url], screenshot_file: payload[:screenshot_file])
+      DriverUtils::take_screenshot(driver: driver, url: payload[:page_url], screenshot_file: "#{Dir.pwd}/public/#{payload[:screenshot_file]}")
       @logger.info 'Screenshot taken'
     end
   end
