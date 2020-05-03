@@ -19,10 +19,10 @@ module WorkerPool
       max_queue: 0
     )
 
-    clean_up_task = Concurrent::TimerTask.new(run_now: true, execution_interval: config['cleanUpInterval']) do
-      @logger.debug "[USAGE STATS] Completed Jobs (#{@pool.completed_task_count}) | Queue Length (#{@pool.queue_length}) | Processed Pages Size (#{@processed_pages.length}) | Registered Recalls Size (#{@registered_recalls.length})"
-    end
-    clean_up_task.execute
+    # clean_up_task = Concurrent::TimerTask.new(run_now: true, execution_interval: config['logUsageIntervalSecs']) do
+    #   @logger.debug "[USAGE STATS] Completed Jobs (#{@pool.completed_task_count}) | Queue Length (#{@pool.queue_length}) | Processed Pages Size (#{@processed_pages.length}) | Registered Recalls Size (#{@registered_recalls.length})"
+    # end
+    # clean_up_task.execute
 
     @logger.info 'Worker pool configured'
     @configured = true
@@ -61,7 +61,7 @@ module WorkerPool
     recall_csv = CSV.new(File.read(payload[:recall_csv_path]))
     File.delete(payload[:recall_csv_path])
 
-    ConnectionResources::with_connection('create violation') do |connection|
+    ConnectionResources::with_connection('refresh recalls') do |connection|
       recall_csv.each_with_index do |recall, i|
         next if i.zero?
         cpsc_recall = RecallUtils::get_recall_by(recall_number: recall[0].gsub(/-/, ''))

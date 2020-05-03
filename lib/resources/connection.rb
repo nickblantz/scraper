@@ -14,12 +14,12 @@ module ConnectionResources
     @pool_size = config['poolSize']
     @resources = Concurrent::Array.new(@pool_size) { |id| Resource.new(id, false, create_connection()) }
 
-    log_usage_task = Concurrent::TimerTask.new(run_now: true, execution_interval: config['logUsageInterval']) do
-      in_use = @resources.count { |r| r.utilized }
-      free = @pool_size - in_use
-      @logger.debug "[USAGE STATS] In Use Connections (#{in_use}) | Free Connections (#{free})"
-    end
-    log_usage_task.execute
+    # log_usage_task = Concurrent::TimerTask.new(run_now: true, execution_interval: config['logUsageIntervalSecs']) do
+    #   in_use = @resources.count { |r| r.utilized }
+    #   free = @pool_size - in_use
+    #   @logger.debug "[USAGE STATS] In Use Connections (#{in_use}) | Free Connections (#{free})"
+    # end
+    # log_usage_task.execute
 
     @logger.info 'Database connection pool configured'
     @configured = true

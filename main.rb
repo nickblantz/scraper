@@ -1,3 +1,4 @@
+require 'concurrent-edge'
 require 'json'
 require 'sinatra/base'
 require 'sinatra/cross_origin'
@@ -26,6 +27,11 @@ module Sinatra
       RecallUtils::configure(logger)
       WorkerPool::configure(config['workerPool'], logger)
 
+      recall_refresh_task = Concurrent::TimerTask.new(run_now: true, execution_interval: config['server']['recallRefreshIntervalSecs']) do
+        WorkerPool::queue_job(WorkerPool::Job.new(:DOWNLOAD_RECALLS_CSV, {}))
+      end
+      recall_refresh_task.execute
+
       enable :cross_origin
       set :bind, '*' if config['server']['production']
       set :port, config['server']['port']
@@ -35,12 +41,12 @@ module Sinatra
       response.headers['Access-Control-Allow-Origin'] = '*'
     end
 
-    get '/scrape_recall/:recall_id' do |recall_id|
+    post '/scrape_recall/:recall_id' do |recall_id|
       WorkerPool::queue_job(WorkerPool::Job.new(:REGISTER_RECALL, { recall: RecallUtils::get_recall_by(recall_id: recall_id) }))
       return "scraping recall #{recall_id}"
     end
 
-    get '/refresh_recalls' do
+    post '/refresh_recalls' do
       WorkerPool::queue_job(WorkerPool::Job.new(:DOWNLOAD_RECALLS_CSV, {}))
       return 'refreshing recalls'
     end

@@ -14,12 +14,12 @@ module DriverResources
     @pool_size = config['poolSize']
     @resources = Concurrent::Array.new(@pool_size) { |id| Resource.new(id, false, create_driver(id)) }
 
-    task = Concurrent::TimerTask.new(run_now: true, execution_interval: config['logUsageInterval']) do
-      in_use = @resources.count { |r| r.utilized }
-      free = @pool_size - in_use
-      @logger.debug "[USAGE STATS] In Use Drivers (#{in_use}) | Free Drivers (#{free})"
-    end
-    task.execute
+    # task = Concurrent::TimerTask.new(run_now: true, execution_interval: config['logUsageIntervalSecs']) do
+    #   in_use = @resources.count { |r| r.utilized }
+    #   free = @pool_size - in_use
+    #   @logger.debug "[USAGE STATS] In Use Drivers (#{in_use}) | Free Drivers (#{free})"
+    # end
+    # task.execute
 
     @logger.info 'Selenium Driver pool configured'
     @logger.debug @resources.inspect
