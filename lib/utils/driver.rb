@@ -56,6 +56,10 @@ module DriverUtils
       @logger.error 'Could not take screenshot'
       @logger.debug e.to_s
       @logger.trace e
+    rescue Exception => e
+      @logger.error 'Could not save screenshot'
+      @logger.debug e.to_s
+      @logger.trace e
     end
   end
 
