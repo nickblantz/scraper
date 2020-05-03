@@ -29,7 +29,7 @@ module RecallUtils
     end
   end
 
-  def self.generate_sortable_date(date)
+  def self.generate_sortable_date(date: date)
     date.match(/([a-zA-Z]+) ([\d]{1,2}), ([\d]{1,4})/) { |m|
       if m.captures[0].nil? || m.captures[1].nil? || m.captures[2].nil?
         @logger.warn "Could not match date #{date}"

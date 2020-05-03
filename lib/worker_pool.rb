@@ -72,7 +72,7 @@ module WorkerPool
           recall_number: recall[0],
           high_priority: 0,
           date: recall[1],
-          sortable_date: RecallUtils::generate_sortable_date(recall[1]),
+          sortable_date: RecallUtils::generate_sortable_date(date: recall[1]),
           recall_heading: recall[2],
           name_of_product: recall[3],
           description: recall[4],
