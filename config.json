@@ -1,7 +1,7 @@
 {
     "server" : {
-        "production" : false,
-        "port" : 4567,
+        "production" : true,
+        "port" : 80,
         "recallRefreshIntervalSecs" : 604800
     },
     "logger" : {
@@ -23,17 +23,17 @@
         
     },
     "driverResources" : {
-        "chromedriverBinaryPath" : "bin/chromedriver.exe",
+        "chromedriverBinaryPath" : "bin/chromedriver",
         "adBlockerExtensionPath" : "selenium_data/adblocker_extension",
         "userDataPath" : "selenium_data",
         "downloadPath" : "selenium_data/temp",
-        "poolSize" : 2,
+        "poolSize" : 32,
         "logUsageIntervalSecs" : 10
     },
     "workerPool" : {
         "downloadPath" : "selenium_data/temp",
         "maxRecurseDepth" : 2,
-        "poolSize" : 2,
+        "poolSize" : 32,
         "logUsageIntervalSecs" : 10
     },
     "linkAnalyzer" : {
