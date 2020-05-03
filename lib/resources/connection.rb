@@ -22,6 +22,7 @@ module ConnectionResources
     # log_usage_task.execute
 
     @logger.info 'Database connection pool configured'
+    @logger.debug @resources.inspect
     @configured = true
   end
 

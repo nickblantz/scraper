@@ -25,6 +25,7 @@ module WorkerPool
     # clean_up_task.execute
 
     @logger.info 'Worker pool configured'
+    @logger.debug @pool.inspect
     @configured = true
   end
 
