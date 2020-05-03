@@ -1,7 +1,7 @@
 {
     "server" : {
-        "production" : true,
-        "port" : 80,
+        "production" : false,
+        "port" : 4567,
         "recallRefreshIntervalSecs" : 604800
     },
     "logger" : {
@@ -27,13 +27,13 @@
         "adBlockerExtensionPath" : "selenium_data/adblocker_extension",
         "userDataPath" : "selenium_data",
         "downloadPath" : "selenium_data/temp",
-        "poolSize" : 32,
+        "poolSize" : 2,
         "logUsageIntervalSecs" : 10
     },
     "workerPool" : {
         "downloadPath" : "selenium_data/temp",
         "maxRecurseDepth" : 2,
-        "poolSize" : 32,
+        "poolSize" : 2,
         "logUsageIntervalSecs" : 10
     },
     "linkAnalyzer" : {
