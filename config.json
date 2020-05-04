@@ -5,7 +5,7 @@
         "recallRefreshIntervalSecs" : 604800
     },
     "logger" : {
-        "standardOut" : true,
+        "standardOut" : false,
         "logFile" : "logs/scraper_app.log",
         "flushInterval" : 50,
         "logLevels" : [
@@ -27,13 +27,13 @@
         "adBlockerExtensionPath" : "selenium_data/adblocker_extension",
         "userDataPath" : "selenium_data",
         "downloadPath" : "selenium_data/temp",
-        "poolSize" : 50,
+        "poolSize" : 32,
         "logUsageIntervalSecs" : 10
     },
     "workerPool" : {
         "downloadPath" : "selenium_data/temp",
         "maxRecurseDepth" : 2,
-        "poolSize" : 50,
+        "poolSize" : 32,
         "logUsageIntervalSecs" : 10
     },
     "linkAnalyzer" : {

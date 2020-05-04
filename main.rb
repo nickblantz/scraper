@@ -33,8 +33,11 @@ module Sinatra
       recall_refresh_task.execute
 
       enable :cross_origin
-      set :bind, '*' if config['server']['production']
       set :port, config['server']['port']
+      if config['server']['production']
+        set :environment, :production
+        set :bind, '*'
+      end
     end
 
     before do
